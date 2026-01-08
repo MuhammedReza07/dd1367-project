@@ -6,7 +6,10 @@ Okay, but seriously... We probably should make one no matter how 1337 we may be 
 Something, something, CMake.
 
 ## Linux (1337)
-TODO :3
+Run the following in your preferred UNIX-like shell from the root directory :3
+```
+cmake -S . -B build -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++; cd build; make
+```
 
 ## Windows
 Good luck <3
