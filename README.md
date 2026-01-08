@@ -20,7 +20,7 @@ To ensure that, among other things, Clang is used to compile the code you may us
 Execute `cmake --help` if you want to know which generators are supported on your platform. Make sure
 to select a generator that is compatible with your IDE.
 
-## Linux, MacOS, and other UNIX-like systems
+## Linux, MacOS and other UNIX-like systems
 Run the following in your preferred shell from the root directory :3
 ```
 cmake -S . -B build -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++; cd build; make; cd ..
