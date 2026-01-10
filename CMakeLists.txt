@@ -1,8 +1,12 @@
 cmake_minimum_required(VERSION 3.28)
 project(dd1367 LANGUAGES C CXX)
 
-# TODO: Only enable these flags in debug builds.
-add_compile_options(-g -O0)
+# Set the default compiler options for build configurations.
+if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+    add_compile_options(-g3 -O0)
+elseif (CMAKE_BUILD_TYPE STREQUAL "Release")
+    add_compile_options(-O3)
+endif()
 
 # External dependencies with a CMakeLists.txt (e.g. SDL).
 add_subdirectory(external/sdl EXCLUDE_FROM_ALL)
@@ -29,8 +33,11 @@ target_link_libraries(imgui PRIVATE SDL3::SDL3)
 # Declare the main executable.
 add_executable(main src/main.cpp)
 
-# TODO: Only enable these flags in debug builds.
-target_compile_options(main PUBLIC -g -O0 -Wall -Wextra)
+# Show all warnings for the project's targets.
+target_compile_options(main PUBLIC -Wall -Wextra)
+
+# Strip all symbols in release builds.
+target_link_options(main PUBLIC $<$<CONFIG:Release>:-Wl,--strip-all>)
 
 # Link dependencies into the main executable.
 target_link_libraries(main PRIVATE SDL3::SDL3 imgui)
