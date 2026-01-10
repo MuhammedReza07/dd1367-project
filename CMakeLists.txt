@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.28)
 project(dd1367 LANGUAGES C CXX)
 
+set (CMAKE_CXX_STANDARD 11)
+
 # Set the default compiler options for build configurations.
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
     add_compile_options(-g3 -O0)
