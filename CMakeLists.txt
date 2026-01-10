@@ -1,7 +1,8 @@
 cmake_minimum_required(VERSION 3.28)
 project(dd1367 LANGUAGES C CXX)
 
-set(CMAKE_CXX_STANDARD 17)
+# Select C++ standard.
+set (CMAKE_CXX_STANDARD 17)
 
 # Set the default compiler options for build configurations.
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
