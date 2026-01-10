@@ -7,7 +7,7 @@ add_compile_options(-g -O0)
 # External dependencies with a CMakeLists.txt (e.g. SDL).
 add_subdirectory(external/sdl EXCLUDE_FROM_ALL)
 
-# ImGUI.
+# ImGui.
 add_library(imgui)
 
 # Add all files in root directory with the extensions .cpp and .h.

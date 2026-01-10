@@ -3,7 +3,7 @@
 Okay, but seriously... We probably should make one no matter how 1337 we may be :3
 
 # Run
-Run `/build/main` from the root directory to get a window!
+Run `./build/main` from the root directory to get an ImGui demo window!
 
 # Build
 All source code required to build the application, including the source code of external libraries such as SDL,
