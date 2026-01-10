@@ -33,4 +33,4 @@ Execute `cmake --help` if you want to know which generators are supported on you
 to select a generator that is compatible with your IDE.
 
 ## Windows
-Good luck <3
+Running main.exe in VisualStudio works for chloe
