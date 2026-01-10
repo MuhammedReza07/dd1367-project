@@ -18,6 +18,7 @@ private:
     ApplicationStatus status;
     int window_width;
     int window_height;
+    float scale;
     std::string window_title;
     SDL_Window* window;
     SDL_Renderer* renderer;
@@ -70,8 +71,7 @@ public:
         }
 
         // Create an SDL window.
-        float scale;
-        if ((scale = scale = SDL_GetDisplayContentScale(SDL_GetPrimaryDisplay())) == 0) {
+        if ((scale = SDL_GetDisplayContentScale(SDL_GetPrimaryDisplay())) == 0) {
             scale = 1;  // Use the scaling factor expected by the display based on its DPI settings, default to 1.
         }
         SDL_WindowFlags flags = SDL_WINDOW_HIDDEN | SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_RESIZABLE;   // The window must be shown explicitly.
@@ -103,29 +103,34 @@ public:
     of the application when the main loop has been terminated.
     */
     void run() {
+        // Prepare whatever it is that will be rendered to the window.
+        
+        // Setup ImGui context.
+        IMGUI_CHECKVERSION();
+        ImGui::CreateContext();
+        ImGuiIO& io = ImGui::GetIO();
+        io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
 
-        // Load image to render and convert it to a texture.
-        SDL_Surface* bmp = SDL_LoadBMP("assets/uwu.bmp");
-        if (bmp == nullptr) {
-            status = RUNTIME_ERROR;
-            return;
-        }
+        // Setup ImGui scaling.
+        ImGuiStyle& style = ImGui::GetStyle();
+        style.ScaleAllSizes(scale); // TODO: Implement dynamic style scaling.
+        style.FontScaleDpi = scale; // Set initial font scale.
 
-        SDL_Texture* texture = SDL_CreateTextureFromSurface(renderer, bmp);
-        SDL_DestroySurface(bmp);
-        if (texture == nullptr) {
-            status = RUNTIME_ERROR;
-            return;
-        }
+        // Setup ImGui platform/renderer backend.
+        ImGui_ImplSDL3_InitForSDLRenderer(window, renderer);
+        ImGui_ImplSDLRenderer3_Init(renderer);
 
+        // Enter the main loop.
         SDL_Event event;
         SDL_zero(event);
         bool quit = false;
 
-        // Enter the main loop.
         while (quit == false) {
             // Event handling.
             while (SDL_PollEvent(&event)) {
+                // Forward events to the ImGui backend.
+                ImGui_ImplSDL3_ProcessEvent(&event);
+
                 // Close the window when necessary.
                 if (event.type == SDL_EVENT_QUIT) {
                     quit = true;
@@ -136,15 +141,36 @@ public:
             }
 
             // Rendering logic.
+
+            // Do no rendering if the window is minimized.
+            if (SDL_GetWindowFlags(window) & SDL_WINDOW_MINIMIZED) {
+                continue;
+            }
+
+            // Start of the ImGui frame.
+            ImGui_ImplSDLRenderer3_NewFrame();
+            ImGui_ImplSDL3_NewFrame();
+            ImGui::NewFrame();
+
+            // Show demo window.
+            ImGui::ShowDemoWindow();
+
+            // Render the ImGui frame.
+            ImGui::Render();
+            SDL_SetRenderScale(renderer, io.DisplayFramebufferScale.x, io.DisplayFramebufferScale.y);
+            SDL_SetRenderDrawColorFloat(renderer, 0, 0, 0, 0);
             SDL_RenderClear(renderer);
-            SDL_RenderTexture(renderer, texture, nullptr, nullptr);
+            ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), renderer);
             SDL_RenderPresent(renderer);
         }
-
-        SDL_DestroyTexture(texture);
     }
 
     ~Application() {
+        // ImGui cleanup.
+        ImGui_ImplSDLRenderer3_Shutdown();
+        ImGui_ImplSDL3_Shutdown();
+        ImGui::DestroyContext();
+
         /*
         SDL cleanup.
 
