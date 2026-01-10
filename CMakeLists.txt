@@ -19,9 +19,9 @@ target_sources(
     PUBLIC
     ${IMGUI_CXX_FILES}
     external/imgui/backends/imgui_impl_sdl3.cpp
-    external/imgui/backends/imgui_impl_sdlgpu3.cpp
+    external/imgui/backends/imgui_impl_sdlrenderer3.cpp
     external/imgui/backends/imgui_impl_sdl3.h
-    external/imgui/backends/imgui_impl_sdlgpu3.h
+    external/imgui/backends/imgui_impl_sdlrenderer3.h
 )
 
 target_link_libraries(imgui PRIVATE SDL3::SDL3)
