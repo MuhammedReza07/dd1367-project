@@ -1,3 +1,4 @@
+#define SDL_MAIN_HANDLED // Added this to define this to avoid SDL overriding our main() function.
 #include <imgui.h>
 #include <imgui_impl_sdl3.h>
 #include <imgui_impl_sdlrenderer3.h>
@@ -151,6 +152,20 @@ public:
             ImGui_ImplSDLRenderer3_NewFrame();
             ImGui_ImplSDL3_NewFrame();
             ImGui::NewFrame();
+
+            ImGui::Begin("Window A");
+            ImGui::Text("This is window A");
+            if (ImGui::Button("Button on window A")) {
+                printf("Button A clicked!\n");
+            }
+            ImGui::End();
+
+            ImGui::Begin("Window B");
+            ImGui::Text("This is window B");
+            if (ImGui::Button("Button on window B")) {
+                printf("Button B clicked!\n");
+            }
+            ImGui::End();
 
             // Show demo window.
             ImGui::ShowDemoWindow();
