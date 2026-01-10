@@ -113,7 +113,7 @@ public:
 
         // Setup ImGui scaling.
         ImGuiStyle& style = ImGui::GetStyle();
-        style.ScaleAllSizes(scale); // TODO: Implement dynamic style scaling.
+        style.ScaleAllSizes(scale);
         style.FontScaleDpi = scale; // Set initial font scale.
 
         // Setup ImGui platform/renderer backend.
