@@ -4,3 +4,5 @@
 Thumbs.db
 Desktop.ini
 $RECYCLE.BIN/
+/build
+*.ini
