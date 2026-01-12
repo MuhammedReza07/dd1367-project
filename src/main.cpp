@@ -12,6 +12,44 @@ enum ApplicationStatus {
     RUNTIME_ERROR           // An error occurred during runtime, e.g. when loading a file.
 };
 
+// File dialog filters (standard template from SDL-wiki, replace with desired formats)
+static constexpr SDL_DialogFileFilter filters[] = {
+    { "PNG images",  "png" },
+    { "JPEG images", "jpg;jpeg" },
+    { "All images",  "png;jpg;jpeg" },
+    { "TXT files",   "txt" },
+    //{ "All files",   "*" }
+};
+
+// Callback function used to bring up file explorer dialog
+static void SDLCALL callback(void* userdata, const char* const* filelist, const int filter)
+{
+    if (!filelist) {
+        SDL_Log("An error occurred: %s", SDL_GetError());
+        return;
+    } else if (!*filelist) {
+        SDL_Log("The user did not select any file.");
+        SDL_Log("Most likely, the dialog was canceled.");
+        return;
+    }
+
+    while (*filelist) {
+        SDL_Log("Full path to selected file: '%s'", *filelist);
+        filelist++;
+    }
+
+    if (filter < 0) {
+        SDL_Log("The current platform does not support fetching "
+                "the selected filter, or the user did not select"
+                " any filter.");
+        return;
+    } else if (filter < SDL_arraysize(filters)) {
+        SDL_Log("The filter selected by the user is '%s' (%s).",
+                filters[filter].pattern, filters[filter].name);
+        return;
+    }
+}
+
 // Because RAII is pretty nice <3
 class Application {
 private:
@@ -151,6 +189,22 @@ public:
             ImGui_ImplSDLRenderer3_NewFrame();
             ImGui_ImplSDL3_NewFrame();
             ImGui::NewFrame();
+
+            // Testing-window that brings up file explorer
+            ImGui::Begin("Window A");
+            ImGui::Text("This is window A");
+            ImGui::Text("Click the button below \nto open file explorer");
+            if (ImGui::Button("Button A")) {
+                printf("Button A clicked!\n");
+                SDL_ShowOpenFileDialog(callback,
+                    nullptr,
+                    window,
+                    filters,
+                    SDL_arraysize(filters),
+                    nullptr,
+                    true);
+            }
+            ImGui::End();
 
             // Show demo window.
             ImGui::ShowDemoWindow();
