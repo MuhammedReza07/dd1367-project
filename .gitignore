@@ -7,3 +7,4 @@ $RECYCLE.BIN/
 /build
 *.ini
 /.vs
+/out
