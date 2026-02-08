@@ -59,3 +59,24 @@ endif()
 
 # Link dependencies into the main executable.
 target_link_libraries(main PRIVATE SDL3::SDL3 imgui)
+
+# Because Windows likes to have its DLLs in the same directory
+# as the binaries using them. The canonical way of doing this
+# is using install(), but for some reason
+#
+# install(FILES $<TARGET_RUNTIME_DLLS:main> TYPE BIN)
+#
+# seems to break on Windows (the install() command has seemingly
+# no effect, at least when using Visual Studio's CMake), so this
+# slightly "hacky" solution is used instead.
+#
+# If more binaries ("runtime targets") are added in the future,
+# we should probably look into more robust installation methods.
+if (WIN32)
+    add_custom_command(
+        TARGET main POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different 
+        $<TARGET_RUNTIME_DLLS:main> $<TARGET_FILE_DIR:main>
+        COMMAND_EXPAND_LISTS
+    )
+endif()
