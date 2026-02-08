@@ -1,13 +1,6 @@
 {
-    "version": 9,
+    "version": 8,
     "$schema": "https://cmake.org/cmake/help/latest/_downloads/3e2d73bff478d88a7de0de736ba5e361/schema.json",
-    "$comment": [
-        "Set the version to the highest one supported by your IDE.",
-        "The schema URL was retrieved from https://cmake.org/cmake/help/latest/manual/cmake-presets.7.html.",
-        "You may find the information there useful for extending this file with more presets.",
-        "Note that this file sets global presets to be used for the entire project, please add your",
-        "local presets to a CMakeUserPresets.json file that is not tracked by source control."
-    ],
     "configurePresets": [
         {
             "name": "debug-msvc",
@@ -37,6 +30,24 @@
                 "type": "equals",
                 "lhs": "${hostSystemName}",
                 "rhs": "Windows"
+            }
+        },
+        {
+            "name": "debug-ninja",
+            "displayName": "Debug (Ninja)",
+            "generator": "Ninja",
+            "binaryDir": "build/debug",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug"
+            }
+        },
+        {
+            "name": "release-ninja",
+            "displayName": "Release (Ninja)",
+            "generator": "Ninja",
+            "binaryDir": "build/release",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release"
             }
         }
     ]
