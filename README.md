@@ -5,6 +5,11 @@ Okay, but seriously... We probably should make one no matter how 1337 we may be 
 # Run
 Run `./build/<build-type-lowercase>/bin/main` from the root directory to get an ImGui demo window!
 
+# Dependencies
+When building on Linux, make sure that all the dependencies of SDL are installed on your system. For more
+information and installation instructions for your specific distribution, please refer to
+[this page on the SDL wiki](https://wiki.libsdl.org/SDL3/README-linux).
+
 # Build
 All source code required to build the application, including the source code of external libraries such as SDL,
 may be found in this repository. Building the application requires you to have CMake and a C/C++ compiler 
