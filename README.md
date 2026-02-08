@@ -42,7 +42,7 @@ cmake --preset <preset-name> -S .; cd build/<build-type-lowercase>; ninja; cd ..
 ```
 
 ## Windows
-Windows builds using the MSVC C/C++ compiler and the latest Visual Studio CMake generator 
+Windows builds using the MSVC C/C++ compiler and the Visual Studio CMake generator 
 (`Visual Studio 18 2026` with `CMAKE_GENERATOR_TOOLSET=v145`) are supported using presets for the
 Visual Studio integrated development environment. There are presets for both debug and release builds
 which may be selected when building in Visual Studio, where they appear as the build configurations
