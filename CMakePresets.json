@@ -1,0 +1,43 @@
+{
+    "version": 9,
+    "$schema": "https://cmake.org/cmake/help/latest/_downloads/3e2d73bff478d88a7de0de736ba5e361/schema.json",
+    "$comment": [
+        "Set the version to the highest one supported by your IDE.",
+        "The schema URL was retrieved from https://cmake.org/cmake/help/latest/manual/cmake-presets.7.html.",
+        "You may find the information there useful for extending this file with more presets.",
+        "Note that this file sets global presets to be used for the entire project, please add your",
+        "local presets to a CMakeUserPresets.json file that is not tracked by source control."
+    ],
+    "configurePresets": [
+        {
+            "name": "debug-msvc",
+            "displayName": "Debug (MSVC)",
+            "generator": "Visual Studio 18 2026",
+            "binaryDir": "build/debug",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "CMAKE_GENERATOR_TOOLSET": "v145"
+            },
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Windows"
+            }
+        },
+        {
+            "name": "release-msvc",
+            "displayName": "Release (MSVC)",
+            "generator": "Visual Studio 18 2026",
+            "binaryDir": "build/release",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "CMAKE_GENERATOR_TOOLSET": "v145"
+            },
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Windows"
+            }
+        }
+    ]
+}

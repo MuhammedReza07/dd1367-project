@@ -16,7 +16,7 @@ if (CMAKE_BUILD_TYPE STREQUAL "Debug")
     endif()
 elseif (CMAKE_BUILD_TYPE STREQUAL "Release")
     if (MSVC)
-        add_compile_options(/O1 /O2 /Ot)
+        add_compile_options(/O3 /Ot)
     else()
         add_compile_options(-O3)
     endif()
@@ -46,6 +46,9 @@ target_link_libraries(imgui PRIVATE SDL3::SDL3)
 
 # Declare the main executable.
 add_executable(main src/main.cpp)
+
+# To avoid problems with Debug/Release in Visual Studio builds.
+set_target_properties(main PROPERTIES RUNTIME_OUTPUT_DIRECTORY bin/$<0:>)
 
 # Show all warnings for the project's targets.
 if (MSVC)
