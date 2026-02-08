@@ -2,13 +2,24 @@ cmake_minimum_required(VERSION 3.28)
 project(dd1367 LANGUAGES C CXX)
 
 # Select C++ standard.
-set (CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 17)
+
+# It is probably reasonable to assume that users not compiling
+# with MSVC are compiling with GCC/Clang instead.
 
 # Set the default compiler options for build configurations.
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-    add_compile_options(-g3 -O0)
+    if (MSVC)
+        add_compile_options(/Zi /Od)
+    else()
+        add_compile_options(-g3 -O0)
+    endif()
 elseif (CMAKE_BUILD_TYPE STREQUAL "Release")
-    add_compile_options(-O3)
+    if (MSVC)
+        add_compile_options(/O1 /O2 /Ot)
+    else()
+        add_compile_options(-O3)
+    endif()
 endif()
 
 # External dependencies with a CMakeLists.txt (e.g. SDL).
@@ -37,10 +48,14 @@ target_link_libraries(imgui PRIVATE SDL3::SDL3)
 add_executable(main src/main.cpp)
 
 # Show all warnings for the project's targets.
-target_compile_options(main PUBLIC -Wall -Wextra)
+if (MSVC)
+    target_compile_options(main PRIVATE /W3)
+else()
+    target_compile_options(main PUBLIC -Wall -Wextra)
 
-# Strip all symbols in release builds.
-target_link_options(main PUBLIC $<$<CONFIG:Release>:-Wl,--strip-all>)
+    # Strip all symbols in release builds.
+    target_link_options(main PUBLIC $<$<CONFIG:Release>:-Wl,--strip-all>)
+endif()
 
 # Link dependencies into the main executable.
 target_link_libraries(main PRIVATE SDL3::SDL3 imgui)
