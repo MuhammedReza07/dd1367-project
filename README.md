@@ -8,7 +8,7 @@ Run `./build/<build-type-lowercase>/bin/main` from the root directory to get an 
 # Dependencies
 When building on Linux, make sure that all the dependencies of SDL are installed on your system. For more
 information and installation instructions for your specific distribution, please refer to
-[this page on the SDL wiki](https://wiki.libsdl.org/SDL3/README-linux).
+[the SDL wiki](https://wiki.libsdl.org/SDL3/README-linux).
 
 # Build
 All source code required to build the application, including the source code of external libraries such as SDL,
