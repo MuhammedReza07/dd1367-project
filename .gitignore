@@ -8,3 +8,4 @@ $RECYCLE.BIN/
 *.ini
 /.vs
 /out
+CMakeUserPresets.json
