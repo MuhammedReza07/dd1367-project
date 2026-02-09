@@ -57,7 +57,13 @@ else()
     target_compile_options(main PUBLIC -Wall -Wextra)
 
     # Strip all symbols in release builds.
-    target_link_options(main PUBLIC $<$<CONFIG:Release>:-Wl,--strip-all>)
+    if (CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+        target_link_options(main PUBLIC $<$<CONFIG:Release>:-Wl,--strip-all>)
+    elseif (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+        target_link_options(main PUBLIC $<$<CONFIG:Release>:-Xlinker --strip-all>)
+    else()
+        message("Unrecognized compiler identification \"${CMAKE_CXX_COMPILER_ID}\", not stripping binary")
+    endif()
 endif()
 
 # Link dependencies into the main executable.
