@@ -62,7 +62,7 @@ else()
     elseif (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
         target_link_options(main PUBLIC $<$<CONFIG:Release>:-Xlinker --strip-all>)
     else()
-        message("Unrecognized compiler identification \"${CMAKE_CXX_COMPILER_ID}\", not stripping binary")
+        message("-- Unrecognized compiler identification \"${CMAKE_CXX_COMPILER_ID}\", not stripping binary")
     endif()
 endif()
 
