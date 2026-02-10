@@ -11,7 +11,7 @@
 // Enumeration of possible status values for the application.
 enum ApplicationStatus {
     SUCCESS,                // Success.
-    INITIALIZATION_ERROR,   // An error occurred during setup, e.g. when creating a window. (SDL errors.)
+    INITIALIZATION_ERROR,   // An error occurred during setup, e.g. when creating a window.
     RUNTIME_ERROR           // An error occurred during runtime, e.g. when loading a file.
 };
 
@@ -66,39 +66,10 @@ private:
 
 public:
     /*
-    Print a human-readable message reflecting the current status of the application.
-
-    @return `true` if `status` is `SUCCESS`, `false` otherwise.
-    */
-    bool print_status() {
-        // Get error messages. (e.g. from SDL.)
-        std::string sdl_error = SDL_GetError();
-
-        switch (status) {
-            case SUCCESS:
-                return true;
-            case INITIALIZATION_ERROR:
-                SDL_Log("Initialization error: %s\n", sdl_error.c_str());
-                break;
-            case RUNTIME_ERROR:
-                if (sdl_error != "") {
-                    SDL_Log("SDL runtime error: %s\n", sdl_error.c_str());
-                } else {
-                    SDL_Log("Runtime error: unknown cause\n");
-                }
-                break;
-            default:
-                SDL_Log("Undefined application status: %d\n", status);
-        }
-
-        return false;
-    }
-
-    /*
-    Initialise the application with the provided window dimensions and title.
+    Initialize the application with the provided window dimensions and title.
 
     @return An `Application` object. Make sure to call `get_status()` on the returned object before 
-    using it to find out if initialisation has failed!
+    using it to find out if initialization has failed!
     */
     Application(int window_width, int window_height, std::string window_title)
     : window_width(window_width), window_height(window_height), window_title(window_title) {
@@ -107,6 +78,7 @@ public:
 
         // Initialize SDL.
         if (SDL_Init(SDL_INIT_VIDEO) == false) {
+            SDL_Log("SDL_Init: %s", SDL_GetError());
             status = INITIALIZATION_ERROR;
             return;
         }
@@ -118,6 +90,7 @@ public:
         SDL_WindowFlags flags = SDL_WINDOW_HIDDEN | SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_RESIZABLE;   // The window must be shown explicitly.
         window = SDL_CreateWindow(window_title.c_str(), (int)(window_width * scale), (int)(window_height * scale), flags);
         if (window == nullptr) {
+            SDL_Log("SDL_CreateWindow: %s", SDL_GetError());
             status = INITIALIZATION_ERROR;
             return;
         }
@@ -125,16 +98,23 @@ public:
         // Create an SDL renderer.
         renderer = SDL_CreateRenderer(window, nullptr);
         if (renderer == nullptr) {
+            SDL_Log("SDL_CreateRenderer: %s", SDL_GetError());
             status = INITIALIZATION_ERROR;
             return;
         }
         // Synchronize renderer with each vertical refresh if possible.
         if (SDL_SetRenderVSync(renderer, 1) == false) {
-            SDL_Log("SetRenderVSync: %s\n", SDL_GetError());
+            SDL_Log("SDL_SetRenderVSync: %s", SDL_GetError());
         }
+    }
 
-        // Show window.
-        SDL_ShowWindow(window);
+    /*
+    Get the status of the application.
+
+    @return the status of the application as an ApplicationStatus value.
+    */
+    ApplicationStatus get_status() {
+        return status;
     }
 
     /*
@@ -144,6 +124,13 @@ public:
     of the application when the main loop has been terminated.
     */
     void run() {
+        // Show window.
+        if (SDL_ShowWindow(window) == false) {
+            SDL_Log("SDL_ShowWindow: %s", SDL_GetError());
+            status = RUNTIME_ERROR;
+            return;
+        };
+
         // Prepare whatever it is that will be rendered to the window.
         
         // Setup ImGui context.
@@ -231,10 +218,10 @@ public:
         /*
         SDL cleanup.
 
-        If the application is not properly initialised, e.g. due to an error,
+        If the application is not properly initialized, e.g. due to an error,
         some fields may be null and that case must be handled properly.
 
-        There might be a cleaner way to do this, but we are not really initialising
+        There might be a cleaner way to do this, but we are not really initializing
         that much stuff so it probably does not matter.
         */
         if (renderer != nullptr) {
@@ -252,15 +239,12 @@ public:
 int main() {
     Application application = Application(960, 540, "I am a window :3");
 
-    // Check for initialization errors.
-    bool status = application.print_status();
-    if (status == true) {
-        // Run the application.
-        application.run();
-
-        // Checking the return value is unnecessary since main() exits immediately afterwards.
-        application.print_status();
+    // Check for initialization errors before running.
+    if (application.get_status() != SUCCESS) {
+        return application.get_status();
     }
 
-    return status;
+    application.run();
+
+    return application.get_status();
 }
