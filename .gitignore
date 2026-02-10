@@ -6,5 +6,7 @@ Desktop.ini
 $RECYCLE.BIN/
 /build
 *.ini
-*.vs
+/.vs
 /out
+CMakeUserPresets.json
+build.sh
