@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.28)
+cmake_minimum_required(VERSION 3.29)
 project(dd1367 LANGUAGES C CXX)
 
 # Select C++ standard.
@@ -52,11 +52,21 @@ set_target_properties(main PROPERTIES RUNTIME_OUTPUT_DIRECTORY bin/$<0:>)
 
 # Show all warnings for the project's targets.
 if (MSVC)
-    target_compile_options(main PRIVATE /W3)
+    target_compile_options(main PUBLIC /W3)
 else()
     target_compile_options(main PUBLIC -Wall -Wextra)
 
     # Strip all symbols in release builds.
+    if (CMAKE_CXX_COMPILER_LINKER_ID MATCHES "GNU")
+        target_link_options(main PUBLIC $<$<CONFIG:Release>:-Wl,--strip-all>)
+    # Because Apple has their own identification for LLD.
+    elseif (CMAKE_CXX_COMPILER_LINKER_ID MATCHES "LLD" OR CMAKE_CXX_COMPILER_LINKER_ID MATCHES "AppleClang")
+        target_link_options(main PUBLIC $<$<CONFIG:Release>:-Xlinker -s>)
+    else()
+        message("-- Unrecognized linker identification \"${CMAKE_CXX_COMPILER_LINKER_ID}\", not stripping binary")
+        message("-- If you are using MSVC, this is expected behavior")
+    endif()
+
     if (CMAKE_CXX_COMPILER_ID MATCHES "GNU")
         target_link_options(main PUBLIC $<$<CONFIG:Release>:-Wl,--strip-all>)
     elseif (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
