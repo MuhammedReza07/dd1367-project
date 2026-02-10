@@ -66,14 +66,6 @@ else()
         message("-- Unrecognized linker identification \"${CMAKE_CXX_COMPILER_LINKER_ID}\", not stripping binary")
         message("-- If you are using MSVC, this is expected behavior")
     endif()
-
-    if (CMAKE_CXX_COMPILER_ID MATCHES "GNU")
-        target_link_options(main PUBLIC $<$<CONFIG:Release>:-Wl,--strip-all>)
-    elseif (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-        target_link_options(main PUBLIC $<$<CONFIG:Release>:-Xlinker --strip-all>)
-    else()
-        message("-- Unrecognized compiler identification \"${CMAKE_CXX_COMPILER_ID}\", not stripping binary")
-    endif()
 endif()
 
 # Link dependencies into the main executable.
