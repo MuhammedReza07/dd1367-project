@@ -1,3 +1,6 @@
+// Because the application is providing its own entry point.
+#define SDL_MAIN_HANDLED 0x39
+
 #include <imgui.h>
 #include <imgui_impl_sdl3.h>
 #include <imgui_impl_sdlrenderer3.h>

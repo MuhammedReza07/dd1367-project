@@ -3,34 +3,52 @@
 Okay, but seriously... We probably should make one no matter how 1337 we may be :3
 
 # Run
-Run `./build/main` from the root directory to get an ImGui demo window!
+Run `./build/<build-type-lowercase>/bin/main` from the root directory to get an ImGui demo window!
+
+# Dependencies
+When building on Linux, make sure that all the dependencies of SDL are installed on your system. For more
+information and installation instructions for your specific distribution, please refer to
+[the SDL wiki](https://wiki.libsdl.org/SDL3/README-linux).
 
 # Build
 All source code required to build the application, including the source code of external libraries such as SDL,
-may be found in this repository. Building the application requires the Clang C/C++ toolchain of the target platform
-and CMake being installed on your system.
+may be found in this repository. Building the application requires you to have CMake (version >= 3.29) and 
+a C/C++ compiler (e.g. GCC, Clang or MSVC) installed on your system.
 
-## Build configurations
-To select a build configuration, add `-DCMAKE_BUILD_TYPE=<configuration-name>` to your build command. Currently,
-the following configurations are available:
-- `Debug`, which includes turns off compiler optimizations and includes debugging information in all binaries.
+## Build types
+You may select a build configuration by setting the `CMAKE_BUILD_TYPE` variable when building the application,
+e.g. by passing `-DCMAKE_BUILD_TYPE=<build-type>` to `cmake`. You may also use one of the presets provided in
+`CMakePresets.json` using `--preset <preset-name>`, which set `CMAKE_BUILD_TYPE` to a suitable value for the
+build in question (e.g. `Debug` when building with the `debug-msvc` preset).
+
+Currently, the following build types (values of `CMAKE_BUILD_TYPE`) are available:
+- `Debug`, which turns off compiler optimizations and includes debugging information in all binaries.
 - `Release`, which turns compiler optimizations on and strips all binaries.
 
-## Linux, MacOS and other UNIX-like systems
-Run the following in your preferred shell from the root directory :3
-```
-cmake -S . -B build -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++; cd build; make; cd ..
-```
+## Local build presets
+The file `CMakePresets.json` contains global CMake presets for this project and is tracked by source control.
+If you wish to add local presets, you may do so by creating a `CMakeUserPresets.json` (which is ignored)
+and add them there.
 
-### Using a C/C++ integrated development environment (IDE)
-If you are using an IDE with built-in support for building and running C/C++ programs with CMake,
-you may need to modify the CMake flags it uses to e.g. ensure that building works as expected.
-To ensure that, among other things, Clang is used to compile the code you may use the following flags:
+## Linux, MacOS and other UNIX-like systems
+If you have `make` installed on your system, you may build the application by running the following command
+in your preferred shell from the project root directory:
 ```
--G <your-generator-of-choice> -S . -B build -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
+cmake -G "Unix Makefiles" -S . -B build; cd build; make; cd ..
 ```
-Execute `cmake --help` if you want to know which generators are supported on your platform. Make sure
-to select a generator that is compatible with your IDE.
+With `ninja` installed, you may also use one of the UNIX-compatible Ninja presets by instead running
+```
+cmake --preset <preset-name> -S .; cd build/<build-type-lowercase>; ninja; cd ../..
+```
 
 ## Windows
-Good luck <3
+Windows builds using the MSVC C/C++ compiler and the Visual Studio CMake generator 
+(`Visual Studio 18 2026` with `CMAKE_GENERATOR_TOOLSET=v145`) are supported using presets for the
+Visual Studio integrated development environment. There are presets for both debug and release builds
+which may be selected when building in Visual Studio, where they appear as the build configurations
+"Debug (MSVC)" and "Release (MSVC)" respectively.
+
+Make sure to select `main.exe` as the startup item for the project after the CMake generation
+has completed to avoid building one of the Visual Studio projects supplied by the dependencies
+in `/external`. Also note that all build-related files will appear in `/build` instead of `/out`
+when using one of the supplied presets.

@@ -1,0 +1,54 @@
+{
+    "version": 8,
+    "$schema": "https://cmake.org/cmake/help/latest/_downloads/3e2d73bff478d88a7de0de736ba5e361/schema.json",
+    "configurePresets": [
+        {
+            "name": "debug-msvc",
+            "displayName": "Debug (MSVC)",
+            "generator": "Visual Studio 18 2026",
+            "binaryDir": "build/debug",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "CMAKE_GENERATOR_TOOLSET": "v145"
+            },
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Windows"
+            }
+        },
+        {
+            "name": "release-msvc",
+            "displayName": "Release (MSVC)",
+            "generator": "Visual Studio 18 2026",
+            "binaryDir": "build/release",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "CMAKE_GENERATOR_TOOLSET": "v145"
+            },
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Windows"
+            }
+        },
+        {
+            "name": "debug-ninja",
+            "displayName": "Debug (Ninja)",
+            "generator": "Ninja",
+            "binaryDir": "build/debug",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug"
+            }
+        },
+        {
+            "name": "release-ninja",
+            "displayName": "Release (Ninja)",
+            "generator": "Ninja",
+            "binaryDir": "build/release",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release"
+            }
+        }
+    ]
+}
