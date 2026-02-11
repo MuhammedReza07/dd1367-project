@@ -3,8 +3,8 @@ run-name: Format merged code
 
 on:
   pull_request:
-    # types:
-    #  - closed
+    types:
+    - closed
 
 jobs:
   format:
