@@ -10,6 +10,8 @@ jobs:
   format:
     runs-on: ubuntu-latest
     steps:
+      # Apparently, this is necessary in order to access the files?
+      - uses: actions/checkout@v1
       - name: Debug using ls
         run: | 
           ls -al
