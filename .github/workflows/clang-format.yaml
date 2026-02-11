@@ -8,6 +8,7 @@ on:
 
 jobs:
   format:
+    if: ${{ github.event.pull_request.merged == true }}
     runs-on: ubuntu-latest
     steps:
       # Apparently, this is necessary in order to access the files?
