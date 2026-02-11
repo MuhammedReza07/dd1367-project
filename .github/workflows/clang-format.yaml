@@ -11,6 +11,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Debug using ls
-        working-directory: 
+        working-directory: src
         run: | 
           ls -al
