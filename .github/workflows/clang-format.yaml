@@ -12,4 +12,4 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Run clang-format on /src
-        run: clang-format --dry-run src
+        run: clang-format --dry-run ./src
