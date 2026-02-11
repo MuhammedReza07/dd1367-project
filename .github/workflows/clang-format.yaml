@@ -12,5 +12,5 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Run clang-format
-        working-directory: ./src
+        working-directory: src
         run: clang-format --dry-run .
