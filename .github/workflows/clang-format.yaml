@@ -1,5 +1,5 @@
 name: Run clang-format to format code when a PR is accepted
-run-name: Running clang-format
+run-name: Format merged code
 
 on:
   pull_request:
@@ -11,6 +11,6 @@ jobs:
     # if: ${{ github.event.pull_request.merged == true }}
     runs-on: ubuntu-latest
     steps:
-      - run: |
-          ls ${{ github.workspace }}
-      - run: clang-format --dry-run src/*
+      - name: Run clang-format
+        working-directory: ./src
+        run: clang-format --dry-run .
