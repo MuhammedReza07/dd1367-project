@@ -11,4 +11,5 @@ jobs:
     # if: ${{ github.event.pull_request.merged == true }}
     runs-on: ubuntu-latest
     steps:
+      - run: ls ${{ github.workspace }}
       - run: clang-format --dry-run src/*
