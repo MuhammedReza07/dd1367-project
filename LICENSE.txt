@@ -1,6 +1,13 @@
 BSD 3-Clause License
 
-Copyright (c) [year], [fullname]
+Copyright (c) 2026, Alexander Rydén
+Copyright (c) 2026, Alfred Fall Lindgren
+Copyright (c) 2026, Chloe Tsai Aronsson
+Copyright (c) 2026, Kimi Kanerva
+Copyright (c) 2026, Leona Johansson
+Copyright (c) 2026, Linn Hagstrand
+Copyright (c) 2026, Muhammed Reza Mehdi
+Copyright (c) 2026, Viktor Själander
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are met:
