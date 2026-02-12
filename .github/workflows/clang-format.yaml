@@ -17,7 +17,7 @@ jobs:
       #   run: clang-format --verbose -i src/*
       - name: Commit and push changes
         run: |
+          git remote add origin git@github.com:MuhammedReza07/dd1367-project.git
           git config --global user.name "clang-format workflow"
           git config --global user.email "clang-format@actions.github.com"
-          git remote add origin git@github.com:MuhammedReza07/dd1367-project.git
           
