@@ -1,0 +1,17 @@
+name: Run clang-format to format code when a PR is accepted
+run-name: Format merged code
+
+on:
+  pull_request:
+    types:
+    - closed
+
+jobs:
+  format:
+    if: ${{ github.event.pull_request.merged == true }}
+    runs-on: ubuntu-latest
+    steps:
+      # Apparently, this is necessary in order to access the files?
+      - uses: actions/checkout@v1
+      - name: Run clang-format on the files in /src
+        run: clang-format --dry-run src/*
