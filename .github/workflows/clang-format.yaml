@@ -16,7 +16,7 @@ jobs:
         run: clang-format --verbose -i src/*
       - name: Commit and push changes
         run: |
-          echo UwU ${{ github.ref_name }}
+          echo UwU ${{ github.head_ref }}
           git config --global user.name "clang-format workflow"
           git config --global user.email "clang-format@actions.github.com"
           git add .
