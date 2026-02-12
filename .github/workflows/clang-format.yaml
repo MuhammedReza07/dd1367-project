@@ -28,3 +28,5 @@ jobs:
           git add .
           git commit -am "format: run clang-format."
           git push
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
