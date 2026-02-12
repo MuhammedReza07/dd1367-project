@@ -1,0 +1,37 @@
+name: Build and lint (Linux, MacOS, Windows)
+run-name: Build and lint (Linux, MacOS, Windows)
+
+on:
+  pull_request:
+    branches:
+      master
+
+permissions:
+  contents: read
+
+# Information about runner images may be found at
+# https://github.com/actions/runner-images/tree/main.
+jobs:
+  # Latest Ubuntu.
+  build-and-lint-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout working branch
+        uses: actions/checkout@v1
+      - name: Build CMake project for Linux
+        run: ./scripts/build-ci.sh
+      - name: Run clang-tidy (lint)
+        run: clang-tidy --format-style=file -p build/compile_commands.json src/*
+
+  # MacOS 15 (arm64).
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout working branch
+        uses: actions/checkout@v1
+      - name: Build CMake project for MacOS
+        run: ./scripts/build-ci.sh
+
+  # Windows Server 2025.
+  build-windows:
+    runs-on: windows-latest
