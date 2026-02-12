@@ -49,6 +49,12 @@
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Release"
             }
+        },
+        {
+            "name": "debug-ninja-ci",
+            "displayName": "UNIX-like CI build",
+            "generator": "Ninja",
+            
         }
     ]
 }
