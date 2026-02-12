@@ -25,3 +25,6 @@ jobs:
           git config --global user.name "clang-format workflow"
           git config --global user.email "clang-format@actions.github.com"
           git branch -l
+          git add .
+          git commit -am "format: run clang-format."
+          git push
