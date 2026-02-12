@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       # Apparently, this is necessary in order to access the files?
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v6
         with: 
           ref: ${{ github.head_ref }}
           
