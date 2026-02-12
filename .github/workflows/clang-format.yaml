@@ -18,5 +18,5 @@ jobs:
         run: |
           git config --global user.name "clang-format workflow"
           git config --global user.email "clang-format@actions.github.com"
-          git commit -am "format: run clang-format."
+          git commit -m "format: run clang-format."
           git push
