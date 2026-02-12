@@ -22,8 +22,8 @@ jobs:
         run: clang-format --verbose -i src/*
       - name: Commit and push changes
         run: |
-          git config --global user.name "clang-format workflow"
-          git config --global user.email "clang-format@actions.github.com"
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions@users.noreply.github.com"
           git branch -l
           git add .
           git commit -am "format: run clang-format."
