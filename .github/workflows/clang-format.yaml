@@ -18,5 +18,5 @@ jobs:
         run: |
           git config --global user.name "clang-format workflow"
           git config --global user.email "clang-format@actions.github.com"
-          git checkout origin/${{ github.head_ref }}
+          git switch origin/${{ github.head_ref }}
           git branch -l
