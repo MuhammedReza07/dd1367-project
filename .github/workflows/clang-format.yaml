@@ -8,7 +8,12 @@ on:
 
 jobs:
   format:
+
     runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
     steps:
       # Apparently, this is necessary in order to access the files?
       - uses: actions/checkout@v1
