@@ -52,9 +52,13 @@
         },
         {
             "name": "debug-ninja-ci",
-            "displayName": "UNIX-like CI build",
+            "displayName": "CI build for Linux/MacOS",
             "generator": "Ninja",
-            
+            "binaryDir": "build",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "CMAKE_EXPORT_COMPILE_COMMANDS": true
+            }
         }
     ]
 }
