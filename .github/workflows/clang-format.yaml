@@ -20,4 +20,6 @@ jobs:
           git config --global user.email "clang-format@actions.github.com"
           git checkout origin/${{ github.head_ref }}
           git switch ${{ github.head_ref }}
-          git branch -l
+          git add .
+          git commit -am "format: run clang-format."
+          git push
