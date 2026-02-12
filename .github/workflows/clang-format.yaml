@@ -6,22 +6,18 @@ on:
     branches:
       - master
 
+permissions:
+  contents: write
+
 jobs:
   format:
-
     runs-on: ubuntu-latest
-
     steps:
-      # Apparently, this is necessary in order to access the files?
-      - uses: actions/checkout@v1
       - name: Run clang-format on the files in /src
         run: clang-format --verbose -i src/*
       - name: Commit and push changes
         run: |
           git config --global user.name "clang-format workflow"
-          git config --global user.email "actions@github.com"
-          git checkout origin/${{ github.head_ref }}
-          git switch ${{ github.head_ref }}
-          git add .
-          git commit -am "format: run clang-format."
-          git push
+          git config --global user.email "clang-format@actions.github.com"
+          git remote add origin git@github.com:MuhammedReza07/dd1367-project.git
+          
