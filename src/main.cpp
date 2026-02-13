@@ -1,11 +1,13 @@
 // Because the application is providing its own entry point.
-#define SDL_MAIN_HANDLED 0x39
+#define SDL_MAIN_HANDLED 0x39   // NOLINT
 
+#include <array>
 #include <imgui.h>
 #include <imgui_impl_sdl3.h>
 #include <imgui_impl_sdlrenderer3.h>
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
+#include <SDL3/SDL_dialog.h>
 #include <string>
 
 // Enumeration of possible status values for the application.
@@ -15,13 +17,11 @@ enum ApplicationStatus {
     RUNTIME_ERROR           // An error occurred during runtime, e.g. when loading a file.
 };
 
-// File dialog filters (standard template from SDL-wiki, replace with desired formats)
-static constexpr SDL_DialogFileFilter filters[] = {
-    { "PNG images",  "png" },
-    { "JPEG images", "jpg;jpeg" },
-    { "All images",  "png;jpg;jpeg" },
-    { "TXT files",   "txt" },
-    //{ "All files",   "*" }
+// File dialog filters.
+const std::array<SDL_DialogFileFilter, 3> dialog_filters = {
+    SDL_DialogFileFilter { "PNG images",  "png" },
+    SDL_DialogFileFilter { "JPEG images", "jpg;jpeg" },
+    SDL_DialogFileFilter { "All images",  "png;jpg;jpeg" },
 };
 
 // Callback function used to bring up file explorer dialog
@@ -46,9 +46,9 @@ static void SDLCALL callback(void* userdata, const char* const* filelist, const 
                 "the selected filter, or the user did not select"
                 " any filter.");
         return;
-    } else if (filter < SDL_arraysize(filters)) {
+    } else if (filter < SDL_arraysize(dialog_filters)) {
         SDL_Log("The filter selected by the user is '%s' (%s).",
-                filters[filter].pattern, filters[filter].name);
+                dialog_filters.data()[filter].pattern, dialog_filters.data()[filter].name);
         return;
     }
 }
@@ -57,8 +57,6 @@ static void SDLCALL callback(void* userdata, const char* const* filelist, const 
 class Application {
 private:
     ApplicationStatus status;
-    int window_width;
-    int window_height;
     float scale;
     std::string window_title;
     SDL_Window* window;
@@ -72,9 +70,7 @@ public:
     using it to find out if initialization has failed!
     */
     Application(int window_width, int window_height, std::string window_title)
-    : window_width(window_width), window_height(window_height), window_title(window_title) {
-        // Set exit status to 0 (success).
-        status = SUCCESS;
+    : status { SUCCESS }, scale {}, window_title(window_title) {
 
         // Initialize SDL.
         if (SDL_Init(SDL_INIT_VIDEO) == false) {
@@ -84,11 +80,17 @@ public:
         }
 
         // Create an SDL window.
-        if ((scale = SDL_GetDisplayContentScale(SDL_GetPrimaryDisplay())) == 0) {
+        float scale = SDL_GetDisplayContentScale(SDL_GetPrimaryDisplay());
+        if (scale == 0) {
             scale = 1;  // Use the scaling factor expected by the display based on its DPI settings, default to 1.
         }
         SDL_WindowFlags flags = SDL_WINDOW_HIDDEN | SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_RESIZABLE;   // The window must be shown explicitly.
-        window = SDL_CreateWindow(window_title.c_str(), (int)(window_width * scale), (int)(window_height * scale), flags);
+        window = SDL_CreateWindow(
+            window_title.c_str(), 
+            static_cast<int>(static_cast<float>(window_width) * scale), 
+            static_cast<int>(static_cast<float>(window_height) * scale), 
+            flags
+        );
         if (window == nullptr) {
             SDL_Log("SDL_CreateWindow: %s", SDL_GetError());
             status = INITIALIZATION_ERROR;
@@ -111,7 +113,7 @@ public:
     /*
     Get the status of the application.
 
-    @return the status of the application as an ApplicationStatus value.
+    @return the status of the application as an `ApplicationStatus` value.
     */
     ApplicationStatus get_status() {
         return status;
@@ -189,8 +191,8 @@ public:
                 SDL_ShowOpenFileDialog(callback,
                     nullptr,
                     window,
-                    filters,
-                    SDL_arraysize(filters),
+                    dialog_filters.data(),
+                    SDL_arraysize(dialog_filters),
                     nullptr,
                     true);
             }
@@ -237,7 +239,10 @@ public:
 };
 
 int main() {
-    Application application = Application(960, 540, "I am a window :3");
+    const int INITIAL_WINDOW_WIDTH = 960;
+    const int INITIAL_WINDOW_HEIGHT = 540;
+
+    Application application = Application(INITIAL_WINDOW_WIDTH, INITIAL_WINDOW_HEIGHT, "I am a window :3");
 
     // Check for initialization errors before running.
     if (application.get_status() != SUCCESS) {
