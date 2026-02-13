@@ -49,6 +49,5 @@ jobs:
     needs: build-macos
     runs-on: windows-latest
     steps:
-      - name: TODO
-        run: |
-          echo "TODO: Implement Windows CI"
+      - name: Run vswhere
+        run: vswhere
