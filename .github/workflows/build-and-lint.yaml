@@ -70,8 +70,18 @@ jobs:
     steps:
       - name: Checkout working branch
         uses: actions/checkout@v6
+      - name: Download build artifacts
+        uses: actions/download-artifact@v6
+        with:
+          name: build-macos
       - name: Build CMake project for MacOS
         run: ./scripts/build-ci.sh
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v6
+        with:
+          name: build-macos
+          path: build
+          overwrite: true
 
   # Windows Server 2025.
   build-windows:
