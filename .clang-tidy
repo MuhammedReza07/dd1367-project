@@ -1,9 +1,17 @@
+# Which headers to check, e.g. everything in /src.
+HeaderFilterRegex: src/*
+
+# The full list of built-in checks may be found at
+# https://clang.llvm.org/extra/clang-tidy/checks/list.html.
 Checks: |
     # Enabled checks.
+    bugprone-*,
     cppcoreguidelines-*,
     google-*,
     # Suppressed checks.
     -cppcoreguidelines-pro-type-vararg
 
 FormatStyle: google
-WarningsAsErrors: "*"
+
+# Add lints that should produce warnings but not errors here.
+WarningsAsErrors: "bugprone-*,google-*"
