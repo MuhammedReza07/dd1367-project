@@ -1,0 +1,9 @@
+Checks: |
+    # Enabled checks.
+    cppcoreguidelines-*,
+    google-*,
+    # Suppressed checks.
+    -cppcoreguidelines-pro-type-vararg
+
+FormatStyle: google
+WarningsAsErrors: true

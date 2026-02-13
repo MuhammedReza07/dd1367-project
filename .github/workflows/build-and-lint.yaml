@@ -1,5 +1,5 @@
-name: Build and lint (Linux, MacOS, Windows)
-run-name: Build and lint
+name: Build and lint
+run-name: Build and lint (Linux, MacOS, Windows)
 
 on:
   pull_request:
@@ -21,10 +21,13 @@ jobs:
       - name: Build CMake project for Linux
         run: ./scripts/build-ci.sh
       - name: Run clang-tidy (lint)
-        run: clang-tidy --format-style=file -p build/compile_commands.json src/*
+        run: clang-tidy --config-file=.clang-tidy -p build/compile_commands.json src/*
+      - name: Run clang-format (style checks)
+        run: clang-format --dry-run src/*
 
   # MacOS 15 (arm64).
   build-macos:
+    needs: build-and-lint-linux
     runs-on: macos-latest
     steps:
       - name: Checkout working branch
@@ -34,6 +37,7 @@ jobs:
 
   # Windows Server 2025.
   build-windows:
+    needs: build-macos
     runs-on: windows-latest
     steps:
       - name: TODO
