@@ -33,3 +33,7 @@ jobs:
   # Windows Server 2025.
   build-windows:
     runs-on: windows-latest
+    steps:
+      - name: TODO
+        run: |
+          echo "TODO: Implement Windows CI"
