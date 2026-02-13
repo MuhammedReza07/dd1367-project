@@ -9,4 +9,3 @@ $RECYCLE.BIN/
 /.vs
 /out
 CMakeUserPresets.json
-build.sh
