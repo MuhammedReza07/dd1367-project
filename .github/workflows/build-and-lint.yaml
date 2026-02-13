@@ -15,6 +15,8 @@ jobs:
   # Initialize build artifacts.
   initialize:
     runs-on: ubuntu-latest
+    # Cursed? Yes, but does it work? Also yes.
+    continue-on-error: true
     steps:
       - name: Create an empty file
         run: touch uwu.txt
@@ -23,19 +25,23 @@ jobs:
         with:
           name: build-linux
           path: uwu.txt
+          overwrite: false
       - name: Initialize build-macos
         uses: actions/upload-artifact@v6
         with:
           name: build-macos
           path: uwu.txt
+          overwrite: false
       - name: Initialize build-windows
         uses: actions/upload-artifact@v6
         with:
           name: build-windows
           path: uwu.txt
+          overwrite: false
 
   # Latest Ubuntu.
   build-and-lint-linux:
+    needs: initialize
     runs-on: ubuntu-latest
     steps:
       - name: Checkout working branch
@@ -55,6 +61,7 @@ jobs:
         with:
           name: build-linux
           path: build
+          overwrite: true
 
   # MacOS 15 (arm64).
   build-macos:
