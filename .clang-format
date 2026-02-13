@@ -1,0 +1,6 @@
+BasedOnStyle: Google
+
+# Some (hopefully non-controversial) indentation rules.
+UseTab: Always
+IndentWidth: 4
+TabWidth: 4
