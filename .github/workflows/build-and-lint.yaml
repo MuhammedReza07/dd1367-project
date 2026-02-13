@@ -12,6 +12,28 @@ permissions:
 # Information about runner images may be found at
 # https://github.com/actions/runner-images/tree/main.
 jobs:
+  # Initialize build artifacts.
+  initialize:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create an empty file
+        run: touch uwu.txt
+      - name: Initialize build-linux
+        uses: actions/upload-artifact@v6
+        with:
+          name: build-linux
+          path: uwu.txt
+      - name: Initialize build-macos
+        uses: actions/upload-artifact@v6
+        with:
+          name: build-macos
+          path: uwu.txt
+      - name: Initialize build-windows
+        uses: actions/upload-artifact@v6
+        with:
+          name: build-windows
+          path: uwu.txt
+
   # Latest Ubuntu.
   build-and-lint-linux:
     runs-on: ubuntu-latest
