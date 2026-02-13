@@ -1,8 +1,10 @@
 name: Build and lint (Linux, MacOS, Windows)
-run-name: Build and lint (Linux, MacOS, Windows)
+run-name: Build and lint
 
 on:
   pull_request:
+    branches:
+      master
 
 permissions:
   contents: read
@@ -19,7 +21,7 @@ jobs:
       - name: Build CMake project for Linux
         run: ./scripts/build-ci.sh
       - name: Run clang-tidy (lint)
-        run: clang-tidy --format-style=file -p build/compile_commands.json src/*
+        run: clang-tidy --format-style=file -p build/ src/*
 
   # MacOS 15 (arm64).
   build-macos:
