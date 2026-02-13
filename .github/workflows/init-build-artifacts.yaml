@@ -8,15 +8,20 @@ jobs:
   initialize:
     runs-on: ubuntu-latest
     steps:
+      - name: Create an empty file
+        run: touch uwu.txt
       - name: Initialize build-linux
         uses: actions/upload-artifact@v6
         with:
           name: build-linux
+          path: uwu.txt
       - name: Initialize build-macos
         uses: actions/upload-artifact@v6
         with:
           name: build-macos
+          path: uwu.txt
       - name: Initialize build-windows
         uses: actions/upload-artifact@v6
         with:
           name: build-windows
+          path: uwu.txt
