@@ -9,3 +9,4 @@ $RECYCLE.BIN/
 /.vs
 /out
 CMakeUserPresets.json
+/.cache

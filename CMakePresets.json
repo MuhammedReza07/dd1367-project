@@ -57,7 +57,8 @@
             "binaryDir": "build",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug",
-                "CMAKE_EXPORT_COMPILE_COMMANDS": true
+                "CMAKE_EXPORT_COMPILE_COMMANDS": true,
+                "SDL_UNIX_CONSOLE_BUILD": "ON"
             }
         }
     ]

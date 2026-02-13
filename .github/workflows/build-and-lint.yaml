@@ -1,4 +1,4 @@
-name: Build and lint (Linux, MacOS, Windows)
+name: Build and lint
 run-name: Build and lint (Linux, MacOS, Windows)
 
 on:
@@ -17,21 +17,38 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout working branch
-        uses: actions/checkout@v1
+        uses: actions/checkout@v6
+      - name: Download build artifacts
+        uses: actions/download-artifact@v6
+        with:
+          name: build-linux
       - name: Build CMake project for Linux
         run: ./scripts/build-ci.sh
       - name: Run clang-tidy (lint)
-        run: clang-tidy --format-style=file -p build/compile_commands.json src/*
+        run: clang-tidy --config-file=.clang-tidy -p build/compile_commands.json src/*
+      - name: Run clang-format (style checks)
+        run: clang-format --Werror --dry-run src/*
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v6
+        with:
+          name: build-linux
+          path: build
 
   # MacOS 15 (arm64).
   build-macos:
+    needs: build-and-lint-linux
     runs-on: macos-latest
     steps:
       - name: Checkout working branch
-        uses: actions/checkout@v1
+        uses: actions/checkout@v6
       - name: Build CMake project for MacOS
         run: ./scripts/build-ci.sh
 
   # Windows Server 2025.
   build-windows:
+    needs: build-macos
     runs-on: windows-latest
+    steps:
+      - name: TODO
+        run: |
+          echo "TODO: Implement Windows CI"
