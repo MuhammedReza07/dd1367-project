@@ -17,9 +17,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout working branch
-        uses: actions/checkout@v1
+        uses: actions/checkout@v6
       - name: Download build artifacts
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v6
         with:
           name: build-linux
       - name: Build CMake project for Linux
@@ -29,7 +29,7 @@ jobs:
       - name: Run clang-format (style checks)
         run: clang-format --Werror --dry-run src/*
       - name: Upload build artifacts
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v6
         with:
           name: build-linux
           path: build
@@ -40,7 +40,7 @@ jobs:
     runs-on: macos-latest
     steps:
       - name: Checkout working branch
-        uses: actions/checkout@v1
+        uses: actions/checkout@v6
       - name: Build CMake project for MacOS
         run: ./scripts/build-ci.sh
 
