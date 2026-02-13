@@ -23,7 +23,7 @@ jobs:
       - name: Run clang-tidy (lint)
         run: clang-tidy --config-file=.clang-tidy -p build/compile_commands.json src/*
       - name: Run clang-format (style checks)
-        run: clang-format --dry-run src/*
+        run: clang-format --Werror --dry-run src/*
 
   # MacOS 15 (arm64).
   build-macos:

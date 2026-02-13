@@ -6,4 +6,4 @@ Checks: |
     -cppcoreguidelines-pro-type-vararg
 
 FormatStyle: google
-WarningsAsErrors: true
+WarningsAsErrors: "*"
