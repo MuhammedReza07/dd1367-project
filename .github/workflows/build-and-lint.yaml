@@ -50,6 +50,7 @@ jobs:
         uses: actions/download-artifact@v6
         with:
           name: build-linux
+          path: build
       - name: Build CMake project for Linux
         run: ./scripts/build-ci.sh
       - name: Run clang-tidy (lint)
@@ -74,6 +75,7 @@ jobs:
         uses: actions/download-artifact@v6
         with:
           name: build-macos
+          path: build
       - name: Build CMake project for MacOS
         run: ./scripts/build-ci.sh
       - name: Upload build artifacts
