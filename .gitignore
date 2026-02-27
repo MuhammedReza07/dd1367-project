@@ -10,3 +10,4 @@ $RECYCLE.BIN/
 /out
 CMakeUserPresets.json
 /.cache
+.clangd
