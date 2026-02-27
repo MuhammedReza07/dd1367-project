@@ -84,7 +84,7 @@ class Application {
 		}
 
 		// Create an SDL window.
-		float scale = SDL_GetDisplayContentScale(SDL_GetPrimaryDisplay());
+		scale = SDL_GetDisplayContentScale(SDL_GetPrimaryDisplay());
 		if (scale == 0) {
 			scale = 1;	// Use the scaling factor expected by the display based
 						// on its DPI settings, default to 1.
