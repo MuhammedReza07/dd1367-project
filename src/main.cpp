@@ -27,11 +27,15 @@ const std::array<SDL_DialogFileFilter, 4> dialog_filters = {
 	SDL_DialogFileFilter{"PNG images", "png"},
 	SDL_DialogFileFilter{"JPEG images", "jpg;jpeg"},
 	SDL_DialogFileFilter{"All images", "png;jpg;jpeg"},
-	SDL_DialogFileFilter{"TXT files", "txt"}, // TXT-files are nice for debugging, let them stay for now
+	SDL_DialogFileFilter{
+		"TXT files",
+		"txt"},	 // TXT-files are nice for debugging, let them stay for now
 };
 
-std::vector<std::string> selected_files; // Vector (aka C++ ArrayList) to store the files selected by the user
-int current_file = 0; // Used to avoid infinite loop of printing, as well as help with choosing multiple files, leave it for now
+std::vector<std::string> selected_files;  // Vector (aka C++ ArrayList) to store
+										  // the files selected by the user
+int current_file = 0;  // Used to avoid infinite loop of printing, as well as
+					   // help with choosing multiple files, leave it for now
 
 // Callback function used to bring up file explorer dialog
 static void SDLCALL callback(void* userdata, const char* const* filelist,
@@ -47,9 +51,11 @@ static void SDLCALL callback(void* userdata, const char* const* filelist,
 
 	while (*filelist) {
 		SDL_Log("Full path to selected file: '%s'", *filelist);
-		std::string filepath = *filelist; // Temporary variable to avoid memory-issues
-		selected_files.push_back(filepath); // Add the selected filepath to the vector
-		filelist++; // Keep iterating through the selected files
+		std::string filepath =
+			*filelist;	// Temporary variable to avoid memory-issues
+		selected_files.push_back(
+			filepath);	// Add the selected filepath to the vector
+		filelist++;		// Keep iterating through the selected files
 	}
 
 	if (filter < 0) {
@@ -206,10 +212,14 @@ class Application {
 					SDL_arraysize(dialog_filters), nullptr, true);
 			}
 
-			// Very rough proof of concept for reading file data from the code above
-			if (!selected_files.empty() && current_file < selected_files.size()) {
-				printf("Filepath: %s\n", selected_files.at(current_file).c_str());
-				void* file_data = SDL_LoadFile(selected_files.at(current_file).c_str(), nullptr);
+			// Very rough proof of concept for reading file data from the code
+			// above
+			if (!selected_files.empty() &&
+				current_file < selected_files.size()) {
+				printf("Filepath: %s\n",
+					   selected_files.at(current_file).c_str());
+				void* file_data = SDL_LoadFile(
+					selected_files.at(current_file).c_str(), nullptr);
 				printf("File-content: %p\n", file_data);
 				current_file++;
 				SDL_free(file_data);
