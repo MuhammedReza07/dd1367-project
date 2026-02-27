@@ -9,6 +9,7 @@
             "binaryDir": "build/debug",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug",
+                "CMAKE_EXPORT_COMPILE_COMMANDS": true,
                 "CMAKE_GENERATOR_TOOLSET": "v145"
             },
             "condition": {
@@ -24,6 +25,7 @@
             "binaryDir": "build/release",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Release",
+                "CMAKE_EXPORT_COMPILE_COMMANDS": true,
                 "CMAKE_GENERATOR_TOOLSET": "v145"
             },
             "condition": {
@@ -38,7 +40,8 @@
             "generator": "Ninja",
             "binaryDir": "build/debug",
             "cacheVariables": {
-                "CMAKE_BUILD_TYPE": "Debug"
+                "CMAKE_BUILD_TYPE": "Debug",
+                "CMAKE_EXPORT_COMPILE_COMMANDS": true
             }
         },
         {
@@ -47,7 +50,8 @@
             "generator": "Ninja",
             "binaryDir": "build/release",
             "cacheVariables": {
-                "CMAKE_BUILD_TYPE": "Release"
+                "CMAKE_BUILD_TYPE": "Release",
+                "CMAKE_EXPORT_COMPILE_COMMANDS": true
             }
         },
         {
