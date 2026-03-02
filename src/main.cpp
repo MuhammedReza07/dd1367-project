@@ -34,8 +34,10 @@ const std::array<SDL_DialogFileFilter, 4> dialog_filters = {
 
 std::vector<std::string> selected_files;  // Vector (aka C++ ArrayList) to store
 										  // the files selected by the user
-std::vector<SDL_Texture*> original_textures; // Store unprocessed textures
-std::vector<SDL_Texture*> manipulated_textures; // Store post-processed textures
+// Store unprocessed textures
+std::vector<SDL_Texture*> original_textures;
+// Store post-processed textures
+std::vector<SDL_Texture*> manipulated_textures;
 
 // Callback function used to bring up file explorer dialog
 static void SDLCALL callback(void* userdata, const char* const* filelist,
@@ -78,15 +80,15 @@ static void SDLCALL callback(void* userdata, const char* const* filelist,
 static void processImages(SDL_Renderer* renderer) {
 	// Loop through all selected files
 	for (const auto& file : selected_files) {
-		SDL_Surface* surface = IMG_Load(file.c_str()); // Create surface
+		SDL_Surface* surface = IMG_Load(file.c_str());	// Create surface
 		if (surface != nullptr) {
 			// ADD PROCESSING LOGIC HERE!
-			SDL_Texture* newTexture = // Create texture of manipulated surface
+			SDL_Texture* newTexture =  // Create texture of manipulated surface
 				SDL_CreateTextureFromSurface(renderer, surface);
 			if (newTexture != nullptr) {
 				manipulated_textures.push_back(newTexture);
 			}
-			SDL_DestroySurface(surface); // Free up memory
+			SDL_DestroySurface(surface);  // Free up memory
 		}
 	}
 }
@@ -236,12 +238,12 @@ class Application {
 			if (!original_textures.empty()) {
 				ImGui::Begin("Original textures");
 				for (const auto texture : original_textures) {
-					float width, height; // Width and height are set below
+					float width, height;  // Width and height are set below
 					SDL_GetTextureSize(texture, &width, &height);
 					ImGui::Image(texture, ImVec2(width, height));
 				}
 				if (ImGui::Button("Process images")) {
-					processImages(renderer); // Click to manipulate images
+					processImages(renderer);  // Click to manipulate images
 				}
 				ImGui::End();
 			}
@@ -250,7 +252,7 @@ class Application {
 			if (!manipulated_textures.empty()) {
 				ImGui::Begin("Manipulated textures");
 				for (const auto texture : manipulated_textures) {
-					float width, height; // Width and height are set below
+					float width, height;  // Width and height are set below
 					SDL_GetTextureSize(texture, &width, &height);
 					ImGui::Image(texture, ImVec2(width, height));
 				}
