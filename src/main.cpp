@@ -3,7 +3,7 @@
 
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_dialog.h>
-#include <SDL3/SDL_iostream.h>
+#include <SDL3_image/SDL_image.h>
 #include <SDL3/SDL_main.h>
 #include <imgui.h>
 #include <imgui_impl_sdl3.h>
@@ -34,8 +34,8 @@ const std::array<SDL_DialogFileFilter, 4> dialog_filters = {
 
 std::vector<std::string> selected_files;  // Vector (aka C++ ArrayList) to store
 										  // the files selected by the user
-int current_file = 0;  // Used to avoid infinite loop of printing, as well as
-					   // help with choosing multiple files, leave it for now
+std::vector<SDL_Texture*> original_textures;
+std::vector<SDL_Texture*> manipulated_textures;
 
 // Callback function used to bring up file explorer dialog
 static void SDLCALL callback(void* userdata, const char* const* filelist,
@@ -55,6 +55,7 @@ static void SDLCALL callback(void* userdata, const char* const* filelist,
 			*filelist;	// Temporary variable to avoid memory-issues
 		selected_files.push_back(
 			filepath);	// Add the selected filepath to the vector
+		original_textures.push_back(IMG_LoadTexture(static_cast<SDL_Renderer*>(userdata), filepath.c_str()));
 		filelist++;		// Keep iterating through the selected files
 	}
 
@@ -69,6 +70,20 @@ static void SDLCALL callback(void* userdata, const char* const* filelist,
 				dialog_filters.data()[filter].pattern,
 				dialog_filters.data()[filter].name);
 		return;
+	}
+}
+
+static void processImages(SDL_Renderer* renderer) {
+	for (const auto& file : selected_files) {
+		SDL_Surface* surface = IMG_Load(file.c_str());
+		if (surface != nullptr) {
+			// ADD PROCESSING LOGIC HERE!
+			SDL_Texture* newTexture = SDL_CreateTextureFromSurface(renderer, surface);
+			if (newTexture != nullptr) {
+				manipulated_textures.push_back(newTexture);
+			}
+			SDL_DestroySurface(surface);
+		}
 	}
 }
 
@@ -208,23 +223,58 @@ class Application {
 			if (ImGui::Button("Button A")) {
 				printf("Button A clicked!\n");
 				SDL_ShowOpenFileDialog(
-					callback, nullptr, window, dialog_filters.data(),
+					callback, renderer, window, dialog_filters.data(),
 					SDL_arraysize(dialog_filters), nullptr, true);
 			}
-
-			// Very rough proof of concept for reading file data from the code
-			// above
-			if (!selected_files.empty() &&
-				current_file < selected_files.size()) {
-				printf("Filepath: %s\n",
-					   selected_files.at(current_file).c_str());
-				void* file_data = SDL_LoadFile(
-					selected_files.at(current_file).c_str(), nullptr);
-				printf("File-content: %p\n", file_data);
-				current_file++;
-				SDL_free(file_data);
-			}
 			ImGui::End();
+
+			/*
+			if (!selected_files.empty() && !stop) {
+				for (const auto& file : selected_files) {
+					SDL_Surface* surface = IMG_Load(file.c_str());
+					if (surface != nullptr) {
+						SDL_Texture* texture = SDL_CreateTextureFromSurface(renderer, surface);
+						if (texture != nullptr) {
+							original_textures.push_back(texture);
+						}
+
+						// Manipulate the surface... (needs own function)
+
+						SDL_Texture* newTexture = SDL_CreateTextureFromSurface(renderer, surface);
+						if (newTexture != nullptr) {
+							manipulated_textures.push_back(newTexture);
+						}
+						SDL_DestroySurface(surface);
+					}
+				}
+				stop = true;
+			}
+			*/
+
+			// Show the original images
+			if (!original_textures.empty()) {
+				ImGui::Begin("Original textures");
+				for (const auto texture : original_textures) {
+					float width, height;
+					SDL_GetTextureSize(texture, &width, &height);
+					ImGui::Image(texture, ImVec2(width, height));
+				}
+				if (ImGui::Button("Process images")) {
+					processImages(renderer);
+				}
+				ImGui::End();
+			}
+
+			// Show the result of the manipulated images
+			if (!manipulated_textures.empty()) {
+				ImGui::Begin("Manipulated textures");
+				for (const auto texture : manipulated_textures) {
+					float width, height;
+					SDL_GetTextureSize(texture, &width, &height);
+					ImGui::Image(texture, ImVec2(width, height));
+				}
+				ImGui::End();
+			}
 
 			// Show demo window.
 			ImGui::ShowDemoWindow();
