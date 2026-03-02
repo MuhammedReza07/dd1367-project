@@ -3,8 +3,8 @@
 
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_dialog.h>
-#include <SDL3_image/SDL_image.h>
 #include <SDL3/SDL_main.h>
+#include <SDL3_image/SDL_image.h>
 #include <imgui.h>
 #include <imgui_impl_sdl3.h>
 #include <imgui_impl_sdlrenderer3.h>
@@ -55,8 +55,9 @@ static void SDLCALL callback(void* userdata, const char* const* filelist,
 			*filelist;	// Temporary variable to avoid memory-issues
 		selected_files.push_back(
 			filepath);	// Add the selected filepath to the vector
-		original_textures.push_back(IMG_LoadTexture(static_cast<SDL_Renderer*>(userdata), filepath.c_str()));
-		filelist++;		// Keep iterating through the selected files
+		original_textures.push_back(IMG_LoadTexture(
+			static_cast<SDL_Renderer*>(userdata), filepath.c_str()));
+		filelist++;	 // Keep iterating through the selected files
 	}
 
 	if (filter < 0) {
@@ -78,7 +79,8 @@ static void processImages(SDL_Renderer* renderer) {
 		SDL_Surface* surface = IMG_Load(file.c_str());
 		if (surface != nullptr) {
 			// ADD PROCESSING LOGIC HERE!
-			SDL_Texture* newTexture = SDL_CreateTextureFromSurface(renderer, surface);
+			SDL_Texture* newTexture =
+				SDL_CreateTextureFromSurface(renderer, surface);
 			if (newTexture != nullptr) {
 				manipulated_textures.push_back(newTexture);
 			}
@@ -233,16 +235,16 @@ class Application {
 				for (const auto& file : selected_files) {
 					SDL_Surface* surface = IMG_Load(file.c_str());
 					if (surface != nullptr) {
-						SDL_Texture* texture = SDL_CreateTextureFromSurface(renderer, surface);
-						if (texture != nullptr) {
-							original_textures.push_back(texture);
+						SDL_Texture* texture =
+			SDL_CreateTextureFromSurface(renderer, surface); if (texture !=
+			nullptr) { original_textures.push_back(texture);
 						}
 
 						// Manipulate the surface... (needs own function)
 
-						SDL_Texture* newTexture = SDL_CreateTextureFromSurface(renderer, surface);
-						if (newTexture != nullptr) {
-							manipulated_textures.push_back(newTexture);
+						SDL_Texture* newTexture =
+			SDL_CreateTextureFromSurface(renderer, surface); if (newTexture !=
+			nullptr) { manipulated_textures.push_back(newTexture);
 						}
 						SDL_DestroySurface(surface);
 					}
