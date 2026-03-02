@@ -34,8 +34,8 @@ const std::array<SDL_DialogFileFilter, 4> dialog_filters = {
 
 std::vector<std::string> selected_files;  // Vector (aka C++ ArrayList) to store
 										  // the files selected by the user
-std::vector<SDL_Texture*> original_textures;
-std::vector<SDL_Texture*> manipulated_textures;
+std::vector<SDL_Texture*> original_textures; // Store unprocessed textures
+std::vector<SDL_Texture*> manipulated_textures; // Store post-processed textures
 
 // Callback function used to bring up file explorer dialog
 static void SDLCALL callback(void* userdata, const char* const* filelist,
@@ -74,17 +74,19 @@ static void SDLCALL callback(void* userdata, const char* const* filelist,
 	}
 }
 
+// Function to process the selected images
 static void processImages(SDL_Renderer* renderer) {
+	// Loop through all selected files
 	for (const auto& file : selected_files) {
-		SDL_Surface* surface = IMG_Load(file.c_str());
+		SDL_Surface* surface = IMG_Load(file.c_str()); // Create surface
 		if (surface != nullptr) {
 			// ADD PROCESSING LOGIC HERE!
-			SDL_Texture* newTexture =
+			SDL_Texture* newTexture = // Create texture of manipulated surface
 				SDL_CreateTextureFromSurface(renderer, surface);
 			if (newTexture != nullptr) {
 				manipulated_textures.push_back(newTexture);
 			}
-			SDL_DestroySurface(surface);
+			SDL_DestroySurface(surface); // Free up memory
 		}
 	}
 }
@@ -99,7 +101,7 @@ class Application {
 	SDL_Renderer* renderer;
 
    public:
-	/*
+	/**
 	Initialize the application with the provided window dimensions and title.
 
 	@return An `Application` object. Make sure to call `get_status()` on the
@@ -146,14 +148,14 @@ class Application {
 		}
 	}
 
-	/*
+	/**
 	Get the status of the application.
 
 	@return the status of the application as an `ApplicationStatus` value.
 	*/
 	ApplicationStatus get_status() { return status; }
 
-	/*
+	/**
 	Run the application.
 
 	@return The `status` value of the `Application` object is set by the
@@ -230,39 +232,16 @@ class Application {
 			}
 			ImGui::End();
 
-			/*
-			if (!selected_files.empty() && !stop) {
-				for (const auto& file : selected_files) {
-					SDL_Surface* surface = IMG_Load(file.c_str());
-					if (surface != nullptr) {
-						SDL_Texture* texture =
-			SDL_CreateTextureFromSurface(renderer, surface); if (texture !=
-			nullptr) { original_textures.push_back(texture);
-						}
-
-						// Manipulate the surface... (needs own function)
-
-						SDL_Texture* newTexture =
-			SDL_CreateTextureFromSurface(renderer, surface); if (newTexture !=
-			nullptr) { manipulated_textures.push_back(newTexture);
-						}
-						SDL_DestroySurface(surface);
-					}
-				}
-				stop = true;
-			}
-			*/
-
 			// Show the original images
 			if (!original_textures.empty()) {
 				ImGui::Begin("Original textures");
 				for (const auto texture : original_textures) {
-					float width, height;
+					float width, height; // Width and height are set below
 					SDL_GetTextureSize(texture, &width, &height);
 					ImGui::Image(texture, ImVec2(width, height));
 				}
 				if (ImGui::Button("Process images")) {
-					processImages(renderer);
+					processImages(renderer); // Click to manipulate images
 				}
 				ImGui::End();
 			}
@@ -271,7 +250,7 @@ class Application {
 			if (!manipulated_textures.empty()) {
 				ImGui::Begin("Manipulated textures");
 				for (const auto texture : manipulated_textures) {
-					float width, height;
+					float width, height; // Width and height are set below
 					SDL_GetTextureSize(texture, &width, &height);
 					ImGui::Image(texture, ImVec2(width, height));
 				}
