@@ -25,6 +25,7 @@ endif()
 # External dependencies with a CMakeLists.txt (e.g. SDL).
 add_subdirectory(external/sdl EXCLUDE_FROM_ALL)
 add_subdirectory(external/sdl_image EXCLUDE_FROM_ALL)
+add_subdirectory(external/bc7enc_rdo EXCLUDE_FROM_ALL)
 
 # ImGui.
 add_library(imgui)
@@ -87,7 +88,7 @@ target_link_libraries(main PRIVATE SDL3_image::SDL3_image SDL3::SDL3 imgui)
 if (WIN32)
     add_custom_command(
         TARGET main POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different 
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
         $<TARGET_RUNTIME_DLLS:main> $<TARGET_FILE_DIR:main>
         COMMAND_EXPAND_LISTS
     )
