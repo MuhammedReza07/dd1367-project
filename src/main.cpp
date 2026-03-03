@@ -83,6 +83,15 @@ static void processImages(SDL_Renderer* renderer) {
 		SDL_Surface* surface = IMG_Load(file.c_str());	// Create surface
 		if (surface != nullptr) {
 			// ADD PROCESSING LOGIC HERE!
+			// #define SDL_MUSTLOCK(S) (((S)->flags & SDL_SURFACE_LOCK_NEEDED)
+			// == SDL_SURFACE_LOCK_NEEDED),
+			//  check if locking is needed
+			if (SDL_LockSurface(surface) == true) {
+				// SDL_CalculateBlit(surface);
+
+				SDL_UnlockSurface(surface)
+			}
+
 			SDL_Texture* newTexture =  // Create texture of manipulated surface
 				SDL_CreateTextureFromSurface(renderer, surface);
 			if (newTexture != nullptr) {
