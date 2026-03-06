@@ -6,12 +6,15 @@
 #include <SDL3/SDL_main.h>
 #include <SDL3_image/SDL_image.h>
 #include <imgui.h>
-#include <imgui_impl_sdl3.h>
-#include <imgui_impl_sdlrenderer3.h>
+#include <backends/imgui_impl_sdl3.h>
+#include <backends/imgui_impl_sdlrenderer3.h>
 
 #include <array>
 #include <string>
 #include <vector>
+
+#include <libbc7enc.h>
+#include <utils.h>
 
 // Enumeration of possible status values for the application.
 enum ApplicationStatus {
@@ -81,7 +84,21 @@ static void processImages(SDL_Renderer* renderer) {
 	// Loop through all selected files
 	for (const auto& file : selected_files) {
 		SDL_Surface* surface = IMG_Load(file.c_str());	// Create surface
+		surface = SDL_ConvertSurface(surface, SDL_PIXELFORMAT_RGBA32);
 		if (surface != nullptr) {
+
+			encode_output output;
+			rdo_bc::rdo_bc_params params;
+			params.m_dxgi_format = DXGI_FORMAT_BC7_UNORM;
+			compress_image_from_memory(surface->w, surface->h, surface->pixels, params, &output);
+			printf("compressed! blocks %d bpb %d mips %d\n", output.num_blocks,
+				   output.bytes_per_block, output.mipmap_count);
+
+			utils::save_dds("test.dds", output.width, output.height,
+							output.mipmap_count, output.blocks,
+							16, DXGI_FORMAT_BC7_UNORM, true,
+							true);
+			
 			// ADD PROCESSING LOGIC HERE!
 			SDL_Texture* newTexture =  // Create texture of manipulated surface
 				SDL_CreateTextureFromSurface(renderer, surface);

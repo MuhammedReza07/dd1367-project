@@ -23,30 +23,30 @@ elseif (CMAKE_BUILD_TYPE STREQUAL "Release")
 endif()
 
 # External dependencies with a CMakeLists.txt (e.g. SDL).
-add_subdirectory(external/sdl EXCLUDE_FROM_ALL)
-add_subdirectory(external/sdl_image EXCLUDE_FROM_ALL)
+add_subdirectory(external/SDL EXCLUDE_FROM_ALL)
 
-# ImGui.
-add_library(imgui)
+set(SDLIMAGE_VENDORED ON)
+set(SDLIMAGE_AVIF OFF)
+set(SDLIMAGE_WEBP OFF)
+add_subdirectory(external/SDL_image EXCLUDE_FROM_ALL)
 
-# Add all files in root directory with the extensions .cpp and .h.
-file(GLOB IMGUI_CXX_FILES "external/imgui/*.cpp" "external/imgui/*.h")
-
-target_include_directories(imgui PUBLIC external/imgui external/imgui/backends)
-target_sources(
-    imgui
-    PUBLIC
-    ${IMGUI_CXX_FILES}
+set(IMGUI_SOURCE 
+    external/imgui/imgui.cpp 
+    external/imgui/imgui_demo.cpp 
+    external/imgui/imgui_widgets.cpp 
+    external/imgui/imgui_draw.cpp 
+    external/imgui/imgui_tables.cpp
     external/imgui/backends/imgui_impl_sdl3.cpp
-    external/imgui/backends/imgui_impl_sdlrenderer3.cpp
-    external/imgui/backends/imgui_impl_sdl3.h
-    external/imgui/backends/imgui_impl_sdlrenderer3.h
-)
-
-target_link_libraries(imgui PRIVATE SDL3_image::SDL3_image SDL3::SDL3)
+    external/imgui/backends/imgui_impl_sdlrenderer3.cpp)
 
 # Declare the main executable.
-add_executable(main src/main.cpp)
+add_executable(main src/main.cpp ${IMGUI_SOURCE})
+
+set(COMPILE_AS_LIBRARY TRUE)
+add_subdirectory(external/bc7enc_rdo)
+target_include_directories(main PRIVATE external/bc7enc_rdo)
+
+target_include_directories(main PRIVATE external/imgui)
 
 # To avoid problems with Debug/Release in Visual Studio builds.
 set_target_properties(main PROPERTIES RUNTIME_OUTPUT_DIRECTORY bin/$<0:>)
@@ -70,7 +70,11 @@ else()
 endif()
 
 # Link dependencies into the main executable.
-target_link_libraries(main PRIVATE SDL3_image::SDL3_image SDL3::SDL3 imgui)
+target_link_libraries(main PRIVATE SDL3_image::SDL3_image SDL3::SDL3 bc7enc)
+
+
+
+
 
 # Because Windows likes to have its DLLs in the same directory
 # as the binaries using them. The canonical way of doing this
