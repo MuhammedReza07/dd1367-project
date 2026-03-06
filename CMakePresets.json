@@ -7,11 +7,12 @@
             "displayName": "Debug (MSVC)",
             "generator": "Visual Studio 18 2026",
             "binaryDir": "build/debug",
-            "cacheVariables": {
-                "CMAKE_BUILD_TYPE": "Debug",
-                "CMAKE_EXPORT_COMPILE_COMMANDS": true,
-                "CMAKE_GENERATOR_TOOLSET": "v145"
-            },
+          "cacheVariables": {
+            "CMAKE_BUILD_TYPE": "Debug",
+            "CMAKE_EXPORT_COMPILE_COMMANDS": true,
+            "CMAKE_GENERATOR_TOOLSET": "v145",
+            "SDLIMAGE_AVIF_VENDORED": false,
+          },
             "condition": {
                 "type": "equals",
                 "lhs": "${hostSystemName}",
