@@ -7,6 +7,7 @@
 [submodule "external/imgui"]
 	path = external/imgui
 	url = git@github.com:ocornut/imgui.git
+    branch = docking
 [submodule "external/bc7enc_rdo"]
 	path = external/bc7enc_rdo
 	url = git@github.com:NogginBops/bc7enc_rdo.git
