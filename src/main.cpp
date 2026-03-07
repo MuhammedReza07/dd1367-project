@@ -4,12 +4,17 @@
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_dialog.h>
 #include <SDL3/SDL_main.h>
+#include <SDL3_image/SDL_image.h>
 #include <imgui.h>
-#include <imgui_impl_sdl3.h>
-#include <imgui_impl_sdlrenderer3.h>
+#include <backends/imgui_impl_sdl3.h>
+#include <backends/imgui_impl_sdlrenderer3.h>
 
 #include <array>
 #include <string>
+#include <vector>
+
+#include <libbc7enc.h>
+#include <utils.h>
 
 // Enumeration of possible status values for the application.
 enum ApplicationStatus {
@@ -21,11 +26,21 @@ enum ApplicationStatus {
 };
 
 // File dialog filters.
-const std::array<SDL_DialogFileFilter, 3> dialog_filters = {
+const std::array<SDL_DialogFileFilter, 4> dialog_filters = {
 	SDL_DialogFileFilter{"PNG images", "png"},
 	SDL_DialogFileFilter{"JPEG images", "jpg;jpeg"},
 	SDL_DialogFileFilter{"All images", "png;jpg;jpeg"},
+	SDL_DialogFileFilter{
+		"TXT files",
+		"txt"},	 // TXT-files are nice for debugging, let them stay for now
 };
+
+std::vector<std::string> selected_files;  // Vector (aka C++ ArrayList) to store
+										  // the files selected by the user
+// Store unprocessed textures
+std::vector<SDL_Texture*> original_textures;
+// Store post-processed textures
+std::vector<SDL_Texture*> manipulated_textures;
 
 // Callback function used to bring up file explorer dialog
 static void SDLCALL callback(void* userdata, const char* const* filelist,
@@ -41,7 +56,13 @@ static void SDLCALL callback(void* userdata, const char* const* filelist,
 
 	while (*filelist) {
 		SDL_Log("Full path to selected file: '%s'", *filelist);
-		filelist++;
+		std::string filepath =
+			*filelist;	// Temporary variable to avoid memory-issues
+		selected_files.push_back(
+			filepath);	// Add the selected filepath to the vector
+		original_textures.push_back(IMG_LoadTexture(
+			static_cast<SDL_Renderer*>(userdata), filepath.c_str()));
+		filelist++;	 // Keep iterating through the selected files
 	}
 
 	if (filter < 0) {
@@ -58,6 +79,35 @@ static void SDLCALL callback(void* userdata, const char* const* filelist,
 	}
 }
 
+// Function to process the selected images
+static void processImages(SDL_Renderer* renderer) {
+	// Loop through all selected files
+	for (const auto& file : selected_files) {
+		SDL_Surface* surface = IMG_Load(file.c_str());	// Create surface
+		surface = SDL_ConvertSurface(surface, SDL_PIXELFORMAT_RGBA32);
+		if (surface != nullptr) {
+
+			encode_output output;
+			rdo_bc::rdo_bc_params params;
+			params.m_dxgi_format = DXGI_FORMAT_BC7_UNORM;
+			bc7enc_compress_image_from_memory(surface->w, surface->h, surface->pixels, params, &output);
+			printf("compressed! blocks %d bpb %d mips %d\n", output.num_blocks,
+				   output.bytes_per_block, output.mipmap_count);
+
+			bc7enc_write_encode_output_to_dds("test.dds", &output, true, true);
+			bc7enc_free_encode_output(&output);
+			
+			// ADD PROCESSING LOGIC HERE!
+			SDL_Texture* newTexture =  // Create texture of manipulated surface
+				SDL_CreateTextureFromSurface(renderer, surface);
+			if (newTexture != nullptr) {
+				manipulated_textures.push_back(newTexture);
+			}
+			SDL_DestroySurface(surface);  // Free up memory
+		}
+	}
+}
+
 // Because RAII is pretty nice <3
 class Application {
    private:
@@ -68,7 +118,7 @@ class Application {
 	SDL_Renderer* renderer;
 
    public:
-	/*
+	/**
 	Initialize the application with the provided window dimensions and title.
 
 	@return An `Application` object. Make sure to call `get_status()` on the
@@ -115,14 +165,14 @@ class Application {
 		}
 	}
 
-	/*
+	/**
 	Get the status of the application.
 
 	@return the status of the application as an `ApplicationStatus` value.
 	*/
 	ApplicationStatus get_status() { return status; }
 
-	/*
+	/**
 	Run the application.
 
 	@return The `status` value of the `Application` object is set by the
@@ -194,10 +244,35 @@ class Application {
 			if (ImGui::Button("Button A")) {
 				printf("Button A clicked!\n");
 				SDL_ShowOpenFileDialog(
-					callback, nullptr, window, dialog_filters.data(),
+					callback, renderer, window, dialog_filters.data(),
 					SDL_arraysize(dialog_filters), nullptr, true);
 			}
 			ImGui::End();
+
+			// Show the original images
+			if (!original_textures.empty()) {
+				ImGui::Begin("Original textures");
+				for (const auto texture : original_textures) {
+					float width, height;  // Width and height are set below
+					SDL_GetTextureSize(texture, &width, &height);
+					ImGui::Image(texture, ImVec2(width, height));
+				}
+				if (ImGui::Button("Process images")) {
+					processImages(renderer);  // Click to manipulate images
+				}
+				ImGui::End();
+			}
+
+			// Show the result of the manipulated images
+			if (!manipulated_textures.empty()) {
+				ImGui::Begin("Manipulated textures");
+				for (const auto texture : manipulated_textures) {
+					float width, height;  // Width and height are set below
+					SDL_GetTextureSize(texture, &width, &height);
+					ImGui::Image(texture, ImVec2(width, height));
+				}
+				ImGui::End();
+			}
 
 			// Show demo window.
 			ImGui::ShowDemoWindow();
