@@ -11,9 +11,17 @@ information and installation instructions for your specific distribution, please
 [the SDL wiki](https://wiki.libsdl.org/SDL3/README-linux).
 
 # Build
-All source code required to build the application, including the source code of external libraries such as SDL,
-may be found in this repository. Building the application requires you to have CMake (version >= 3.29) and 
-a C/C++ compiler (e.g. GCC, Clang or MSVC) installed on your system.
+Building the application requires you to have CMake (version >= 3.29) and a C/C++ compiler (e.g. GCC, Clang or MSVC) 
+installed on your system.
+
+## Updating submodules
+This repository uses Git submodules to manage dependencies. If your development environment does not automatically 
+manage submodules, you may run the following commands from the root directory in your shell of choice after cloning 
+the repository using `git clone`:
+```
+git submodule init
+git submodule update --remote --recursive
+```
 
 ## Build types
 You may select a build configuration by setting the `CMAKE_BUILD_TYPE` variable when building the application,
