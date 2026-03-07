@@ -90,14 +90,12 @@ static void processImages(SDL_Renderer* renderer) {
 			encode_output output;
 			rdo_bc::rdo_bc_params params;
 			params.m_dxgi_format = DXGI_FORMAT_BC7_UNORM;
-			compress_image_from_memory(surface->w, surface->h, surface->pixels, params, &output);
+			bc7enc_compress_image_from_memory(surface->w, surface->h, surface->pixels, params, &output);
 			printf("compressed! blocks %d bpb %d mips %d\n", output.num_blocks,
 				   output.bytes_per_block, output.mipmap_count);
 
-			utils::save_dds("test.dds", output.width, output.height,
-							output.mipmap_count, output.blocks,
-							16, DXGI_FORMAT_BC7_UNORM, true,
-							true);
+			bc7enc_write_encode_output_to_dds("test.dds", &output, true, true);
+			bc7enc_free_encode_output(&output);
 			
 			// ADD PROCESSING LOGIC HERE!
 			SDL_Texture* newTexture =  // Create texture of manipulated surface

@@ -25,7 +25,7 @@ endif()
 # External dependencies with a CMakeLists.txt (e.g. SDL).
 add_subdirectory(external/SDL EXCLUDE_FROM_ALL)
 
-set(SDLIMAGE_VENDORED ON)
+set(SDLIMAGE_VENDORED OFF)
 set(SDLIMAGE_AVIF OFF)
 set(SDLIMAGE_WEBP OFF)
 add_subdirectory(external/SDL_image EXCLUDE_FROM_ALL)
@@ -42,7 +42,9 @@ set(IMGUI_SOURCE
 # Declare the main executable.
 add_executable(main src/main.cpp ${IMGUI_SOURCE})
 
-set(COMPILE_AS_LIBRARY TRUE)
+set(BC7ENC_COMPILE_AS_LIBRARY TRUE)
+set(BC7ENC_SHARED_LIBRARY FALSE)
+set(BC7ENC_BUILD_X64 TRUE)
 add_subdirectory(external/bc7enc_rdo)
 target_include_directories(main PRIVATE external/bc7enc_rdo)
 
@@ -71,10 +73,6 @@ endif()
 
 # Link dependencies into the main executable.
 target_link_libraries(main PRIVATE SDL3_image::SDL3_image SDL3::SDL3 bc7enc)
-
-
-
-
 
 # Because Windows likes to have its DLLs in the same directory
 # as the binaries using them. The canonical way of doing this
