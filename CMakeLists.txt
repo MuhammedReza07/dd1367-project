@@ -28,6 +28,9 @@ add_subdirectory(external/SDL EXCLUDE_FROM_ALL)
 set(SDLIMAGE_VENDORED OFF)
 set(SDLIMAGE_AVIF OFF)
 set(SDLIMAGE_WEBP OFF)
+set(SDLIMAGE_JXL OFF)
+set(SDLIMAGE_TIF OFF)
+set(SDLIMAGE_PNG_LIBPNG OFF) # libpng is only used for APNG
 add_subdirectory(external/SDL_image EXCLUDE_FROM_ALL)
 
 set(IMGUI_SOURCE 
