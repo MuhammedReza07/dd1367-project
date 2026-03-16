@@ -93,12 +93,13 @@ static void processImages(SDL_Renderer* renderer) {
 			printf("compressed! blocks %d bpb %d mips %d\n", output.num_blocks,
 				   output.bytes_per_block, output.mipmap_count);
 
-			bc7enc_write_encode_output_to_dds("test.dds", &output, true, true);
+			bc7enc_write_encode_output_to_dds("test.dds", &output, true, false);
 			bc7enc_free_encode_output(&output);
 
 			// ADD PROCESSING LOGIC HERE!
-			SDL_Texture* newTexture =  // Create texture of manipulated surface
-				SDL_CreateTextureFromSurface(renderer, surface);
+			//SDL_Texture* newTexture =  // Create texture of manipulated surface
+			//	SDL_CreateTextureFromSurface(renderer, surface);
+			SDL_Texture* newTexture = IMG_LoadTexture(renderer, "test.dds");
 			if (newTexture != nullptr) {
 				manipulated_textures.push_back(newTexture);
 			}
