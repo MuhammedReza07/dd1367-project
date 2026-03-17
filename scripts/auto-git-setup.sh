@@ -1,0 +1,25 @@
+#!/bin/sh
+
+echo "Setting up git submodules..."
+git submodule init
+git submodule update --recursive
+cd external
+cd SDL
+git fetch origin tag release-3.4.2 --no-tags
+git checkout tags/release-3.4.2 --force
+cd ..
+cd SDL_image
+git fetch origin tag release-3.4.0 --no-tags
+git checkout tags/release-3.4.0 --force
+cd ..
+cd bc7enc_rdo
+git fetch
+git checkout library
+cd ..
+cd imgui
+git fetch origin tag v1.92.6-docking --no-tags
+git checkout tags/v1.92.6-docking --force
+cd ..
+cd ..
+echo "Finished setting up submodules."
+
