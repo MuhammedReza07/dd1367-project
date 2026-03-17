@@ -1,21 +1,17 @@
 [submodule "external/SDL"]
 	path = external/SDL
 	url = git@github.com:libsdl-org/SDL.git
-	ignore = all
 	shallow = true
 [submodule "external/SDL_image"]
 	path = external/SDL_image
 	url = git@github.com:libsdl-org/SDL_image.git
-	ignore = all
 	shallow = true
 [submodule "external/imgui"]
 	path = external/imgui
 	url = git@github.com:ocornut/imgui.git
     branch = docking
-	ignore = all
 	shallow = true
 [submodule "external/bc7enc_rdo"]
 	path = external/bc7enc_rdo
 	url = git@github.com:NogginBops/bc7enc_rdo.git
 	branch = library
-	ignore = all
