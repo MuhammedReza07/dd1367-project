@@ -15,13 +15,12 @@ Building the application requires you to have CMake (version >= 3.29) and a C/C+
 installed on your system.
 
 ## Updating submodules
-This repository uses Git submodules to manage dependencies. If your development environment does not automatically 
-manage submodules, you may run the following commands from the root directory in your shell of choice after cloning 
-the repository using `git clone`:
-```
-git submodule init
-git submodule update --remote --recursive
-```
+This repository uses Git submodules to manage dependencies. To avoid making the `.git` folder bloated with gigabytes 
+worth of history for the external libraries, most submodules are set to be "shallow" per default. Because of this,
+you are strongly advised to run the `scripts/auto-git-setup.sh` in the project root immediately after cloning the repository,
+unless you absolutely know what you are doing. Of course, you are first advised to look at the script yourself before blindly
+following a random guide on the internet, both for your own safety and so that you know what is going on behind the scenes.
+If you are using Windows, having some version of BASH installed is probably mandatory.
 
 ## Build types
 You may select a build configuration by setting the `CMAKE_BUILD_TYPE` variable when building the application,
