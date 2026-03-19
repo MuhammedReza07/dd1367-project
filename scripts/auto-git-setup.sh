@@ -1,8 +1,6 @@
 #!/bin/sh
 
-echo "Setting up git submodules..."
-git submodule init
-git submodule update --recursive
+echo "Checking out submodules to safe releases..."
 cd external
 cd SDL
 git fetch origin tag release-3.4.2 --no-tags
@@ -21,5 +19,5 @@ git fetch origin tag v1.92.6-docking --no-tags
 git checkout tags/v1.92.6-docking --force
 cd ..
 cd ..
-echo "Finished setting up submodules."
+echo "Finished checking out submodules."
 

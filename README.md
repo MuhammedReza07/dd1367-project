@@ -16,10 +16,35 @@ installed on your system.
 
 ## Updating submodules
 This repository uses Git submodules to manage dependencies. To avoid making the `.git` folder bloated with gigabytes 
-worth of history for the external libraries, most submodules are set to be "shallow" per default. Because of this,
-you are strongly advised to run the `scripts/auto-git-setup.sh` in the project root immediately after cloning the repository,
-unless you absolutely know what you are doing. On UNIX-like systems, this can be done by typing `sh scripts/auto-git-setup.sh`
-in the project root. Of course, you are first advised to look at the script yourself before blindly following a random guide 
+worth of history for the external libraries, most submodules are set to be "shallow" per default. To initiate the 
+submodules after cloning the repository, run the following commands in the project root: 
+```
+git submodule init
+git submodule update --recursive
+```
+In the majority of cases, this will be enough to start development with all external libraries. 
+
+However, if you wish to pull upstream changes from the submodules, you will have to manually switch branch or checkout the
+submodule, since they per default are in a "detatched HEAD"-state. To do this, simply navigate to the submodule you wish to 
+update and run `git checkout <name_of_desired_branch>` and then run `git pull`. For example, lets say you are in the project
+root and wish to pull upstream changes from the library-branch of bc7enc\_rdo. To do that, you would do the following (after
+already running the commands above):
+```
+cd external/bc7enc_rdo
+git checkout library
+git pull
+```
+If Git complains about local changes, either `git stash` them, or (if you do not want to keep your changes) use `git checkout 
+library --force`.
+
+If you receive errors such as `fatal: remote error: upload-pack: not our ref` after running `git submodule update --recursive`
+you may have to run the `scripts/auto-git-setup.sh` in the project root. This script ensures that the submodules are checked out 
+to specific, existing and stable releases of the library. On UNIX-like systems, this can be done by typing 
+`sh scripts/auto-git-setup.sh` in the project root. If the errors *still* persist, the specified commits to our
+submodules have most likely been deleted via a rebase or force-push, and you will have to find your own commit from the libraries
+GitHub that you want to add as a submodule. 
+
+If you do decide to run the script, you are of course first advised to **look at the script yourself** before blindly following a random guide 
 on the internet, both for your own safety and so that you know what is going on behind the scenes.
 If you are using Windows, you will have to use something like Git Bash or WSL in order to run the shell-script. 
 
