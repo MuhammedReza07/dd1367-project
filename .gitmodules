@@ -9,9 +9,14 @@
 [submodule "external/imgui"]
 	path = external/imgui
 	url = git@github.com:ocornut/imgui.git
-    branch = docking
+    	branch = docking
 	shallow = true
 [submodule "external/bc7enc_rdo"]
 	path = external/bc7enc_rdo
 	url = git@github.com:NogginBops/bc7enc_rdo.git
 	branch = library
+[submodule "external/imgui-node-editor"]
+	path = external/imgui-node-editor
+	url = git@github.com:thedmd/imgui-node-editor.git
+	branch = develop
+	shallow = true
