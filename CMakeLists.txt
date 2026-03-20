@@ -42,8 +42,17 @@ set(IMGUI_SOURCE
     external/imgui/backends/imgui_impl_sdl3.cpp
     external/imgui/backends/imgui_impl_sdlrenderer3.cpp)
 
+set(IMGUI_NODE_EDITOR_SOURCE
+    external/imgui-node-editor/crude_json.cpp
+    external/imgui-node-editor/imgui_canvas.cpp
+    external/imgui-node-editor/imgui_node_editor.cpp
+    external/imgui-node-editor/imgui_node_editor_api.cpp)
+
 # Declare the main executable.
-add_executable(main src/main.cpp ${IMGUI_SOURCE})
+add_executable(main
+    src/main.cpp
+    ${IMGUI_SOURCE}
+    ${IMGUI_NODE_EDITOR_SOURCE})
 
 set(BC7ENC_COMPILE_AS_LIBRARY TRUE)
 set(BC7ENC_SHARED_LIBRARY FALSE)
@@ -51,7 +60,7 @@ set(BC7ENC_BUILD_X64 TRUE)
 add_subdirectory(external/bc7enc_rdo)
 target_include_directories(main PRIVATE external/bc7enc_rdo)
 
-target_include_directories(main PRIVATE external/imgui)
+target_include_directories(main PRIVATE external/imgui external/imgui-node-editor)
 
 # To avoid problems with Debug/Release in Visual Studio builds.
 set_target_properties(main PROPERTIES RUNTIME_OUTPUT_DIRECTORY bin/$<0:>)
