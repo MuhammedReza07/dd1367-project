@@ -15,8 +15,12 @@ git fetch
 git checkout library
 cd ..
 cd imgui
-git fetch origin tag v1.92.6-docking --no-tags
-git checkout tags/v1.92.6-docking --force
+git fetch origin tag v1.92.5-docking --no-tags
+git checkout tags/v1.92.5-docking --force
+cd ..
+cd imgui-node-editor
+git fetch
+git checkout develop
 cd ..
 cd ..
 echo "Finished checking out submodules."
