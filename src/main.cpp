@@ -8,12 +8,15 @@
 #include <backends/imgui_impl_sdl3.h>
 #include <backends/imgui_impl_sdlrenderer3.h>
 #include <imgui.h>
+#include <imgui_internal.h>
+#include <imgui_node_editor.h>
 #include <libbc7enc.h>
-#include <utils.h>
 
 #include <array>
 #include <string>
 #include <vector>
+
+namespace NodeImGui = ax::NodeEditor;
 
 // Enumeration of possible status values for the application.
 enum ApplicationStatus {
@@ -97,8 +100,8 @@ static void processImages(SDL_Renderer* renderer) {
 			bc7enc_free_encode_output(&output);
 
 			// ADD PROCESSING LOGIC HERE!
-			//SDL_Texture* newTexture =  // Create texture of manipulated surface
-			//	SDL_CreateTextureFromSurface(renderer, surface);
+			// SDL_Texture* newTexture =  // Create texture of manipulated
+			// surface 	SDL_CreateTextureFromSurface(renderer, surface);
 			SDL_Texture* newTexture = IMG_LoadTexture(renderer, "test.dds");
 			if (newTexture != nullptr) {
 				manipulated_textures.push_back(newTexture);
@@ -172,6 +175,15 @@ class Application {
 	*/
 	ApplicationStatus get_status() { return status; }
 
+	NodeImGui::EditorContext* nodeContext = nullptr;
+	struct Link {
+		NodeImGui::LinkId id;
+		NodeImGui::PinId startPin;
+		NodeImGui::PinId endPin;
+	};
+	ImVector<Link> links;
+	int uniqueId = 1;
+
 	/**
 	Run the application.
 
@@ -203,6 +215,11 @@ class Application {
 		// Setup ImGui platform/renderer backend.
 		ImGui_ImplSDL3_InitForSDLRenderer(window, renderer);
 		ImGui_ImplSDLRenderer3_Init(renderer);
+
+		// Setup ImGui Node Editor context
+		NodeImGui::Config config;
+		config.SettingsFile = "NodeEditor.json";
+		nodeContext = NodeImGui::CreateEditor(&config);
 
 		// Enter the main loop.
 		SDL_Event event;
@@ -277,6 +294,129 @@ class Application {
 			// Show demo window.
 			ImGui::ShowDemoWindow();
 
+			// Node editor
+			ImGui::Begin("Node Editor");
+			// ImGui::SetWindowPos(ImVec2(20, io.DisplaySize.y - 300));
+			// Display FPS in the Node Editor just because it is funny
+			const auto& imIO = ImGui::GetIO();
+			ImGui::Text("FPS: %d (%.2gms)", static_cast<int>(imIO.Framerate),
+						imIO.Framerate ? 1000.0f / imIO.Framerate : 0.0f);
+			ImGui::Separator();
+			NodeImGui::SetCurrentEditor(nodeContext);
+			NodeImGui::Begin("My Node Editor");
+
+			// Set up unique hard coded testing IDs for nodes, pins and links
+			NodeImGui::NodeId testNode1 = 1;
+			NodeImGui::PinId testInput1 = 2;
+			NodeImGui::PinId testOutput1 = 3;
+			NodeImGui::NodeId testNode2 = 4;
+			NodeImGui::PinId testInput2 = 5;
+			NodeImGui::PinId testOutput2 = 6;
+			NodeImGui::NodeId testNode3 = 7;
+			NodeImGui::PinId testInput3 = 8;
+			NodeImGui::PinId testOutput3 = 9;
+
+			// Create Node 1
+			NodeImGui::BeginNode(testNode1);
+			ImGui::Text("Test Node 1");
+
+			// Create Input pin for Node 1
+			NodeImGui::BeginPin(testInput1, NodeImGui::PinKind::Input);
+			ImGui::Text("-> Input");
+			NodeImGui::EndPin();
+
+			// Create Output pin for Node 1
+			ImGui::SameLine();	// Place Output next to Input instead of under
+			NodeImGui::BeginPin(testOutput1, NodeImGui::PinKind::Output);
+			ImGui::Text("Output ->");
+			NodeImGui::EndPin();
+
+			ImGui::Button("A button that\ndoes absolutely\nnothing");
+			// Close Node 1
+			NodeImGui::EndNode();
+
+			// Create Node 2
+			NodeImGui::BeginNode(testNode2);
+			ImGui::Text("Test Node 2");
+
+			// Create Input pin for Node 2
+			NodeImGui::BeginPin(testInput2, NodeImGui::PinKind::Input);
+			ImGui::Text("-> Input");
+			NodeImGui::EndPin();
+
+			// Create Output pin for Node 2
+			ImGui::SameLine();	// Place Output next to Input instead of under
+			NodeImGui::BeginPin(testOutput2, NodeImGui::PinKind::Output);
+			ImGui::Text("Output ->");
+			NodeImGui::EndPin();
+
+			// Close Node 2
+			NodeImGui::EndNode();
+
+			// Create Node 3
+			NodeImGui::BeginNode(testNode3);
+			ImGui::Text("Test Node 3");
+
+			// Create Input pin for Node 1
+			NodeImGui::BeginPin(testInput3, NodeImGui::PinKind::Input);
+			ImGui::Text("-> Input");
+			NodeImGui::EndPin();
+
+			// Create Output pin for Node 3
+			ImGui::SameLine();	// Place Output next to Input instead of under
+			NodeImGui::BeginPin(testOutput3, NodeImGui::PinKind::Output);
+			ImGui::Text("Output ->");
+			NodeImGui::EndPin();
+
+			// Close Node 3
+			NodeImGui::EndNode();
+
+			if (NodeImGui::BeginCreate()) {
+				NodeImGui::PinId inputPin, outputPin;
+				if (NodeImGui::QueryNewLink(&inputPin, &outputPin)) {
+					if (inputPin && outputPin && NodeImGui::AcceptNewItem()) {
+						Link link;
+						link.id = uniqueId++;
+						link.startPin = inputPin;
+						link.endPin = outputPin;
+						printf("Link Created: %d -> %d with ID %d \n",
+							   static_cast<int>(link.startPin.Get()),
+							   static_cast<int>(link.endPin.Get()),
+							   static_cast<int>(link.id.Get()));
+						links.push_back(link);
+						// NodeImGui::Link(testLink2, outputPin, inputPin);
+					}
+				}
+				NodeImGui::EndCreate();
+			}
+
+			if (NodeImGui::BeginDelete()) {
+				NodeImGui::LinkId deletedLinkId;
+				while (NodeImGui::QueryDeletedLink(&deletedLinkId)) {
+					if (NodeImGui::AcceptDeletedItem()) {
+						for (auto& link : links) {
+							if (link.id == deletedLinkId) {
+								links.erase(&link);
+								printf("Link Deleted: %d\n",
+									   static_cast<int>(deletedLinkId.Get()));
+								break;
+							}
+						}
+					}
+				}
+				NodeImGui::EndDelete();
+			}
+
+			// Render links
+			for (auto& [id, startPin, endPin] : links) {
+				NodeImGui::Link(id, startPin, endPin);
+			}
+
+			// Close Node editor
+			NodeImGui::End();
+			NodeImGui::SetCurrentEditor(nullptr);
+			ImGui::End();
+
 			// Render the ImGui frame.
 			ImGui::Render();
 			SDL_SetRenderScale(renderer, io.DisplayFramebufferScale.x,
@@ -291,6 +431,7 @@ class Application {
 
 	~Application() {
 		// ImGui cleanup.
+		NodeImGui::DestroyEditor(nodeContext);
 		ImGui_ImplSDLRenderer3_Shutdown();
 		ImGui_ImplSDL3_Shutdown();
 		ImGui::DestroyContext();
