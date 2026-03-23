@@ -28,7 +28,7 @@ enum ApplicationStatus {
 };
 
 // File dialog filters.
-const std::array<SDL_DialogFileFilter, 4> dialog_filters = {
+constexpr std::array<SDL_DialogFileFilter, 4> dialog_filters = {
 	SDL_DialogFileFilter{"PNG images", "png"},
 	SDL_DialogFileFilter{"JPEG images", "jpg;jpeg"},
 	SDL_DialogFileFilter{"All images", "png;jpg;jpeg"},
@@ -127,7 +127,8 @@ class Application {
 	@return An `Application` object. Make sure to call `get_status()` on the
 	returned object before using it to find out if initialization has failed!
 	*/
-	Application(int window_width, int window_height, std::string window_title)
+	Application(const int window_width, const int window_height,
+				const std::string& window_title)
 		: status{SUCCESS}, scale{}, window_title(window_title) {
 		// Initialize SDL.
 		if (SDL_Init(SDL_INIT_VIDEO) == false) {
@@ -142,7 +143,7 @@ class Application {
 			scale = 1;	// Use the scaling factor expected by the display based
 						// on its DPI settings, default to 1.
 		}
-		SDL_WindowFlags flags =
+		constexpr SDL_WindowFlags flags =
 			SDL_WINDOW_HIDDEN | SDL_WINDOW_HIGH_PIXEL_DENSITY |
 			SDL_WINDOW_RESIZABLE;  // The window must be shown explicitly.
 		window = SDL_CreateWindow(
@@ -297,24 +298,24 @@ class Application {
 			// Node editor
 			ImGui::Begin("Node Editor");
 			// ImGui::SetWindowPos(ImVec2(20, io.DisplaySize.y - 300));
+
 			// Display FPS in the Node Editor just because it is funny
-			const auto& imIO = ImGui::GetIO();
-			ImGui::Text("FPS: %d (%.2gms)", static_cast<int>(imIO.Framerate),
-						imIO.Framerate ? 1000.0f / imIO.Framerate : 0.0f);
+			ImGui::Text("FPS: %d (%.2gms)", static_cast<int>(io.Framerate),
+						io.Framerate ? 1000.0f / io.Framerate : 0.0f);
 			ImGui::Separator();
 			NodeImGui::SetCurrentEditor(nodeContext);
 			NodeImGui::Begin("My Node Editor");
 
 			// Set up unique hard coded testing IDs for nodes, pins and links
-			NodeImGui::NodeId testNode1 = 1;
-			NodeImGui::PinId testInput1 = 2;
-			NodeImGui::PinId testOutput1 = 3;
-			NodeImGui::NodeId testNode2 = 4;
-			NodeImGui::PinId testInput2 = 5;
-			NodeImGui::PinId testOutput2 = 6;
-			NodeImGui::NodeId testNode3 = 7;
-			NodeImGui::PinId testInput3 = 8;
-			NodeImGui::PinId testOutput3 = 9;
+			const NodeImGui::NodeId testNode1 = 1;
+			const NodeImGui::PinId testInput1 = 2;
+			const NodeImGui::PinId testOutput1 = 3;
+			const NodeImGui::NodeId testNode2 = 4;
+			const NodeImGui::PinId testInput2 = 5;
+			const NodeImGui::PinId testOutput2 = 6;
+			const NodeImGui::NodeId testNode3 = 7;
+			const NodeImGui::PinId testInput3 = 8;
+			const NodeImGui::PinId testOutput3 = 9;
 
 			// Create Node 1
 			NodeImGui::BeginNode(testNode1);
@@ -458,8 +459,8 @@ class Application {
 };
 
 int main() {
-	const int INITIAL_WINDOW_WIDTH = 960;
-	const int INITIAL_WINDOW_HEIGHT = 540;
+	constexpr int INITIAL_WINDOW_WIDTH = 960;
+	constexpr int INITIAL_WINDOW_HEIGHT = 540;
 
 	Application application = Application(
 		INITIAL_WINDOW_WIDTH, INITIAL_WINDOW_HEIGHT, "I am a window :3");
