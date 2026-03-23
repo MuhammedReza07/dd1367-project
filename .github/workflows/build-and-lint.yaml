@@ -18,6 +18,8 @@ jobs:
     steps:
       - name: Checkout working branch
         uses: actions/checkout@v6
+      - name: Checkout submodules
+        run: git submodule update --init --recursive
       - name: Build CMake project for Linux
         run: ./scripts/build-ci.sh
       - name: Run clang-tidy (lint)
@@ -32,6 +34,8 @@ jobs:
     steps:
       - name: Checkout working branch
         uses: actions/checkout@v6
+      - name: Checkout submodules
+        run: git submodule update --init --recursive
       - name: Build CMake project for MacOS
         run: ./scripts/build-ci.sh
 
