@@ -301,7 +301,7 @@ class Application {
 
 			// Display FPS in the Node Editor just because it is funny
 			ImGui::Text("FPS: %d (%.2gms)", static_cast<int>(io.Framerate),
-						io.Framerate ? 1000.0f / io.Framerate : 0.0f);
+						io.Framerate != 0 ? 1000.0f / io.Framerate : 0.0f);
 			ImGui::Separator();
 			NodeImGui::SetCurrentEditor(nodeContext);
 			NodeImGui::Begin("My Node Editor");
