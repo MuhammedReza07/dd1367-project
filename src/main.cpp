@@ -4,12 +4,19 @@
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_dialog.h>
 #include <SDL3/SDL_main.h>
+#include <SDL3_image/SDL_image.h>
+#include <backends/imgui_impl_sdl3.h>
+#include <backends/imgui_impl_sdlrenderer3.h>
 #include <imgui.h>
-#include <imgui_impl_sdl3.h>
-#include <imgui_impl_sdlrenderer3.h>
+#include <imgui_internal.h>
+#include <imgui_node_editor.h>
+#include <libbc7enc.h>
 
 #include <array>
 #include <string>
+#include <vector>
+
+namespace NodeImGui = ax::NodeEditor;
 
 // Enumeration of possible status values for the application.
 enum ApplicationStatus {
@@ -21,11 +28,21 @@ enum ApplicationStatus {
 };
 
 // File dialog filters.
-const std::array<SDL_DialogFileFilter, 3> dialog_filters = {
+constexpr std::array<SDL_DialogFileFilter, 4> dialog_filters = {
 	SDL_DialogFileFilter{"PNG images", "png"},
 	SDL_DialogFileFilter{"JPEG images", "jpg;jpeg"},
 	SDL_DialogFileFilter{"All images", "png;jpg;jpeg"},
+	SDL_DialogFileFilter{
+		"TXT files",
+		"txt"},	 // TXT-files are nice for debugging, let them stay for now
 };
+
+std::vector<std::string> selected_files;  // Vector (aka C++ ArrayList) to store
+										  // the files selected by the user
+// Store unprocessed textures
+std::vector<SDL_Texture*> original_textures;
+// Store post-processed textures
+std::vector<SDL_Texture*> manipulated_textures;
 
 // Callback function used to bring up file explorer dialog
 static void SDLCALL callback(void* userdata, const char* const* filelist,
@@ -41,7 +58,13 @@ static void SDLCALL callback(void* userdata, const char* const* filelist,
 
 	while (*filelist) {
 		SDL_Log("Full path to selected file: '%s'", *filelist);
-		filelist++;
+		std::string filepath =
+			*filelist;	// Temporary variable to avoid memory-issues
+		selected_files.push_back(
+			filepath);	// Add the selected filepath to the vector
+		original_textures.push_back(IMG_LoadTexture(
+			static_cast<SDL_Renderer*>(userdata), filepath.c_str()));
+		filelist++;	 // Keep iterating through the selected files
 	}
 
 	if (filter < 0) {
@@ -58,6 +81,36 @@ static void SDLCALL callback(void* userdata, const char* const* filelist,
 	}
 }
 
+// Function to process the selected images
+static void processImages(SDL_Renderer* renderer) {
+	// Loop through all selected files
+	for (const auto& file : selected_files) {
+		SDL_Surface* surface = IMG_Load(file.c_str());	// Create surface
+		surface = SDL_ConvertSurface(surface, SDL_PIXELFORMAT_RGBA32);
+		if (surface != nullptr) {
+			encode_output output;
+			rdo_bc::rdo_bc_params params;
+			params.m_dxgi_format = DXGI_FORMAT_BC7_UNORM;
+			bc7enc_compress_image_from_memory(surface->w, surface->h,
+											  surface->pixels, params, &output);
+			printf("compressed! blocks %d bpb %d mips %d\n", output.num_blocks,
+				   output.bytes_per_block, output.mipmap_count);
+
+			bc7enc_write_encode_output_to_dds("test.dds", &output, true, false);
+			bc7enc_free_encode_output(&output);
+
+			// ADD PROCESSING LOGIC HERE!
+			// SDL_Texture* newTexture =  // Create texture of manipulated
+			// surface 	SDL_CreateTextureFromSurface(renderer, surface);
+			SDL_Texture* newTexture = IMG_LoadTexture(renderer, "test.dds");
+			if (newTexture != nullptr) {
+				manipulated_textures.push_back(newTexture);
+			}
+			SDL_DestroySurface(surface);  // Free up memory
+		}
+	}
+}
+
 // Because RAII is pretty nice <3
 class Application {
    private:
@@ -68,13 +121,14 @@ class Application {
 	SDL_Renderer* renderer;
 
    public:
-	/*
+	/**
 	Initialize the application with the provided window dimensions and title.
 
 	@return An `Application` object. Make sure to call `get_status()` on the
 	returned object before using it to find out if initialization has failed!
 	*/
-	Application(int window_width, int window_height, std::string window_title)
+	Application(const int window_width, const int window_height,
+				const std::string& window_title)
 		: status{SUCCESS}, scale{}, window_title(window_title) {
 		// Initialize SDL.
 		if (SDL_Init(SDL_INIT_VIDEO) == false) {
@@ -89,7 +143,7 @@ class Application {
 			scale = 1;	// Use the scaling factor expected by the display based
 						// on its DPI settings, default to 1.
 		}
-		SDL_WindowFlags flags =
+		constexpr SDL_WindowFlags flags =
 			SDL_WINDOW_HIDDEN | SDL_WINDOW_HIGH_PIXEL_DENSITY |
 			SDL_WINDOW_RESIZABLE;  // The window must be shown explicitly.
 		window = SDL_CreateWindow(
@@ -115,14 +169,23 @@ class Application {
 		}
 	}
 
-	/*
+	/**
 	Get the status of the application.
 
 	@return the status of the application as an `ApplicationStatus` value.
 	*/
 	ApplicationStatus get_status() { return status; }
 
-	/*
+	NodeImGui::EditorContext* nodeContext = nullptr;
+	struct Link {
+		NodeImGui::LinkId id;
+		NodeImGui::PinId startPin;
+		NodeImGui::PinId endPin;
+	};
+	ImVector<Link> links;
+	int uniqueId = 1;
+
+	/**
 	Run the application.
 
 	@return The `status` value of the `Application` object is set by the
@@ -153,6 +216,11 @@ class Application {
 		// Setup ImGui platform/renderer backend.
 		ImGui_ImplSDL3_InitForSDLRenderer(window, renderer);
 		ImGui_ImplSDLRenderer3_Init(renderer);
+
+		// Setup ImGui Node Editor context
+		NodeImGui::Config config;
+		config.SettingsFile = "NodeEditor.json";
+		nodeContext = NodeImGui::CreateEditor(&config);
 
 		// Enter the main loop.
 		SDL_Event event;
@@ -194,13 +262,161 @@ class Application {
 			if (ImGui::Button("Button A")) {
 				printf("Button A clicked!\n");
 				SDL_ShowOpenFileDialog(
-					callback, nullptr, window, dialog_filters.data(),
+					callback, renderer, window, dialog_filters.data(),
 					SDL_arraysize(dialog_filters), nullptr, true);
 			}
 			ImGui::End();
 
+			// Show the original images
+			if (!original_textures.empty()) {
+				ImGui::Begin("Original textures");
+				for (const auto texture : original_textures) {
+					float width, height;  // Width and height are set below
+					SDL_GetTextureSize(texture, &width, &height);
+					ImGui::Image(texture, ImVec2(width, height));
+				}
+				if (ImGui::Button("Process images")) {
+					processImages(renderer);  // Click to manipulate images
+				}
+				ImGui::End();
+			}
+
+			// Show the result of the manipulated images
+			if (!manipulated_textures.empty()) {
+				ImGui::Begin("Manipulated textures");
+				for (const auto texture : manipulated_textures) {
+					float width, height;  // Width and height are set below
+					SDL_GetTextureSize(texture, &width, &height);
+					ImGui::Image(texture, ImVec2(width, height));
+				}
+				ImGui::End();
+			}
+
 			// Show demo window.
 			ImGui::ShowDemoWindow();
+
+			// Node editor
+			ImGui::Begin("Node Editor");
+			// ImGui::SetWindowPos(ImVec2(20, io.DisplaySize.y - 300));
+
+			// Display FPS in the Node Editor just because it is funny
+			ImGui::Text("FPS: %d (%.2gms)", static_cast<int>(io.Framerate),
+						io.Framerate != 0 ? 1000.0f / io.Framerate : 0.0f);
+			ImGui::Separator();
+			NodeImGui::SetCurrentEditor(nodeContext);
+			NodeImGui::Begin("My Node Editor");
+
+			// Set up unique hard coded testing IDs for nodes, pins and links
+			const NodeImGui::NodeId testNode1 = 1;
+			const NodeImGui::PinId testInput1 = 2;
+			const NodeImGui::PinId testOutput1 = 3;
+			const NodeImGui::NodeId testNode2 = 4;
+			const NodeImGui::PinId testInput2 = 5;
+			const NodeImGui::PinId testOutput2 = 6;
+			const NodeImGui::NodeId testNode3 = 7;
+			const NodeImGui::PinId testInput3 = 8;
+			const NodeImGui::PinId testOutput3 = 9;
+
+			// Create Node 1
+			NodeImGui::BeginNode(testNode1);
+			ImGui::Text("Test Node 1");
+
+			// Create Input pin for Node 1
+			NodeImGui::BeginPin(testInput1, NodeImGui::PinKind::Input);
+			ImGui::Text("-> Input");
+			NodeImGui::EndPin();
+
+			// Create Output pin for Node 1
+			ImGui::SameLine();	// Place Output next to Input instead of under
+			NodeImGui::BeginPin(testOutput1, NodeImGui::PinKind::Output);
+			ImGui::Text("Output ->");
+			NodeImGui::EndPin();
+
+			ImGui::Button("A button that\ndoes absolutely\nnothing");
+			// Close Node 1
+			NodeImGui::EndNode();
+
+			// Create Node 2
+			NodeImGui::BeginNode(testNode2);
+			ImGui::Text("Test Node 2");
+
+			// Create Input pin for Node 2
+			NodeImGui::BeginPin(testInput2, NodeImGui::PinKind::Input);
+			ImGui::Text("-> Input");
+			NodeImGui::EndPin();
+
+			// Create Output pin for Node 2
+			ImGui::SameLine();	// Place Output next to Input instead of under
+			NodeImGui::BeginPin(testOutput2, NodeImGui::PinKind::Output);
+			ImGui::Text("Output ->");
+			NodeImGui::EndPin();
+
+			// Close Node 2
+			NodeImGui::EndNode();
+
+			// Create Node 3
+			NodeImGui::BeginNode(testNode3);
+			ImGui::Text("Test Node 3");
+
+			// Create Input pin for Node 1
+			NodeImGui::BeginPin(testInput3, NodeImGui::PinKind::Input);
+			ImGui::Text("-> Input");
+			NodeImGui::EndPin();
+
+			// Create Output pin for Node 3
+			ImGui::SameLine();	// Place Output next to Input instead of under
+			NodeImGui::BeginPin(testOutput3, NodeImGui::PinKind::Output);
+			ImGui::Text("Output ->");
+			NodeImGui::EndPin();
+
+			// Close Node 3
+			NodeImGui::EndNode();
+
+			if (NodeImGui::BeginCreate()) {
+				NodeImGui::PinId inputPin, outputPin;
+				if (NodeImGui::QueryNewLink(&inputPin, &outputPin)) {
+					if (inputPin && outputPin && NodeImGui::AcceptNewItem()) {
+						Link link;
+						link.id = uniqueId++;
+						link.startPin = inputPin;
+						link.endPin = outputPin;
+						printf("Link Created: %d -> %d with ID %d \n",
+							   static_cast<int>(link.startPin.Get()),
+							   static_cast<int>(link.endPin.Get()),
+							   static_cast<int>(link.id.Get()));
+						links.push_back(link);
+						// NodeImGui::Link(testLink2, outputPin, inputPin);
+					}
+				}
+				NodeImGui::EndCreate();
+			}
+
+			if (NodeImGui::BeginDelete()) {
+				NodeImGui::LinkId deletedLinkId;
+				while (NodeImGui::QueryDeletedLink(&deletedLinkId)) {
+					if (NodeImGui::AcceptDeletedItem()) {
+						for (auto& link : links) {
+							if (link.id == deletedLinkId) {
+								links.erase(&link);
+								printf("Link Deleted: %d\n",
+									   static_cast<int>(deletedLinkId.Get()));
+								break;
+							}
+						}
+					}
+				}
+				NodeImGui::EndDelete();
+			}
+
+			// Render links
+			for (auto& [id, startPin, endPin] : links) {
+				NodeImGui::Link(id, startPin, endPin);
+			}
+
+			// Close Node editor
+			NodeImGui::End();
+			NodeImGui::SetCurrentEditor(nullptr);
+			ImGui::End();
 
 			// Render the ImGui frame.
 			ImGui::Render();
@@ -216,6 +432,7 @@ class Application {
 
 	~Application() {
 		// ImGui cleanup.
+		NodeImGui::DestroyEditor(nodeContext);
 		ImGui_ImplSDLRenderer3_Shutdown();
 		ImGui_ImplSDL3_Shutdown();
 		ImGui::DestroyContext();
@@ -242,8 +459,8 @@ class Application {
 };
 
 int main() {
-	const int INITIAL_WINDOW_WIDTH = 960;
-	const int INITIAL_WINDOW_HEIGHT = 540;
+	constexpr int INITIAL_WINDOW_WIDTH = 960;
+	constexpr int INITIAL_WINDOW_HEIGHT = 540;
 
 	Application application = Application(
 		INITIAL_WINDOW_WIDTH, INITIAL_WINDOW_HEIGHT, "I am a window :3");
