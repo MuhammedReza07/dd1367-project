@@ -22,7 +22,16 @@ submodules after cloning the repository, run the following commands in the proje
 git submodule init
 git submodule update --recursive
 ```
-In the majority of cases, this will be enough to start development with all external libraries. 
+Or, if you (for some reason) do not want shallow submodules and instead want the full history (and potentially unused
+nested submodules), you can instead run the following: 
+```
+git submodule update --init --recursive
+```
+Do note that the size of the project folder will be more than three times as large using this method, so if you care about
+your storage at all and do not have a good reason to, we recommend using the first set of commands, especially since most
+of the extra data is pretty much useless for the average developer. 
+
+In the majority of cases, any of these options will be enough to start development with all necessary external libraries. 
 
 However, if you wish to pull upstream changes from the submodules, you will have to manually switch branch or checkout the
 submodule, since they per default are in a "detatched HEAD"-state. To do this, simply navigate to the submodule you wish to 
@@ -30,12 +39,24 @@ update and run `git checkout <name_of_desired_branch>` and then run `git pull`. 
 root and wish to pull upstream changes from the library-branch of bc7enc\_rdo. To do that, you would do the following (after
 already running the commands above):
 ```
-cd external/bc7enc_rdo
+cd external
+cd bc7enc_rdo
 git checkout library
 git pull
 ```
 If Git complains about local changes, either `git stash` them, or (if you do not want to keep your changes) use `git checkout 
 library --force`.
+
+If you are unfamiliar with how Git submodules work, you should know that pulling upstream changes inside a submodule will count
+as a modified file in the project repository. If you were to run `git diff` in the project root after modifying a submodule, it
+will look something like this: 
+```diff
+-Subproject commit 4a35aba8bffa67f250537479cc33892f3c224e8f
++Subproject commit 0561eb8d49edcd55560e9d7bca79ac11cf4209df
+```
+This means that the submodule you modified has changed from pointing to the commit 4a35... to now instead point to commit 0561...
+This modification can be committed pushed to origin just like any other modification, but if you do not know what you are doing,
+or if you did not intend to modify the submodule, you should not push those changes before figuring out what has changed.
 
 If you receive errors such as `fatal: remote error: upload-pack: not our ref` after running `git submodule update --recursive`
 you may have to run the `scripts/auto-git-setup.sh` in the project root. This script ensures that the submodules are checked out 
