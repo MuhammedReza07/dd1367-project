@@ -127,8 +127,7 @@ class Application {
 	@return An `Application` object. Make sure to call `get_status()` on the
 	returned object before using it to find out if initialization has failed!
 	*/
-	Application(const int window_width, const int window_height,
-				const std::string& window_title)
+	Application(const std::string& window_title)
 		: status{SUCCESS}, scale{}, window_title(window_title) {
 		// Initialize SDL.
 		if (SDL_Init(SDL_INIT_VIDEO) == false) {
@@ -148,8 +147,9 @@ class Application {
 			SDL_WINDOW_RESIZABLE;  // The window must be shown explicitly.
 		window = SDL_CreateWindow(
 			window_title.c_str(),
-			static_cast<int>(static_cast<float>(window_width) * scale),
-			static_cast<int>(static_cast<float>(window_height) * scale), flags);
+			static_cast<int>(static_cast<float>(1780) * scale), //i think this should automatically adapt to user screen size
+			static_cast<int>(static_cast<float>(900) * scale),
+			flags);
 		if (window == nullptr) {
 			SDL_Log("SDL_CreateWindow: %s", SDL_GetError());
 			status = INITIALIZATION_ERROR;
@@ -185,14 +185,67 @@ class Application {
 	ImVector<Link> links;
 	int uniqueId = 1;
 
-	/**
-	Run the application.
 
-	@return The `status` value of the `Application` object is set by the
-	function to reflect the state of the application when the main loop has been
-	terminated.
-	*/
-	void run() {
+	// menu for handling the nodestuff
+	static void LeftSideMenu() {
+		ImGui::Begin("Window A", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize);
+		if (ImGui::CollapsingHeader("Options 1")) {
+		}
+		if (ImGui::CollapsingHeader("Options 2")) {
+		}
+		if (ImGui::CollapsingHeader("Options 3")) {
+		}
+		if (ImGui::CollapsingHeader("Options 4")) {
+		}
+		if (ImGui::CollapsingHeader("Options 5")) {
+		}
+		ImGui::Text("In this big space below vvvv I think you could have like a pop-up type window where you can change the attributes of a node? since it might get messy if it happens in the node gra");
+		ImGui::End();
+	}
+
+	// menu for handling "projects"? like saving graphs, and idk. it's the main menu bar, like the one you usually see in apps
+	static void ShowMainMenuBar() {
+		if (ImGui::BeginMainMenuBar()) {
+			if (ImGui::BeginMenu("File")) {
+				ImGui::EndMenu();
+			}
+			if (ImGui::BeginMenu("Edit")) {
+				ImGui::EndMenu();
+			}
+			if (ImGui::BeginMenu("View")) {
+				ImGui::EndMenu();
+			}
+			if (ImGui::BeginMenu("Help")) {
+				ImGui::EndMenu();
+			}
+			ImGui::EndMainMenuBar();
+		}
+	}
+
+void ShowNodeEditor() {
+		// Setup ImGui Node Editor context
+		static NodeImGui::EditorContext* nodeContext = nullptr;
+		if (!nodeContext) {
+			NodeImGui::Config config;
+			config.SettingsFile = "NodeEditor.json";
+			nodeContext = NodeImGui::CreateEditor(&config);
+		}
+
+		// Node editor
+		if (ImGui::Begin("Node Editor", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize)) {
+			ImGui::Text("Panning in the canvas space doesn't work :/  probably something to do with how the nodestuff is set up idk");
+			NodeImGui::SetCurrentEditor(nodeContext);
+			ImVec2 size = ImGui::GetContentRegionAvail();
+				NodeImGui::Begin("My Node Editor", size);
+				NodeImGui::End();
+			NodeImGui::SetCurrentEditor(nullptr);
+			ImGui::End();
+		}
+	}
+	
+	// This function is just for testing and experimenting with ImGui and the
+	// node editor. Testing different designs 
+	void GUI_experimenting() {
 		// Show window.
 		if (SDL_ShowWindow(window) == false) {
 			SDL_Log("SDL_ShowWindow: %s", SDL_GetError());
@@ -217,11 +270,6 @@ class Application {
 		ImGui_ImplSDL3_InitForSDLRenderer(window, renderer);
 		ImGui_ImplSDLRenderer3_Init(renderer);
 
-		// Setup ImGui Node Editor context
-		NodeImGui::Config config;
-		config.SettingsFile = "NodeEditor.json";
-		nodeContext = NodeImGui::CreateEditor(&config);
-
 		// Enter the main loop.
 		SDL_Event event;
 		SDL_zero(event);
@@ -243,8 +291,6 @@ class Application {
 				}
 			}
 
-			// Rendering logic.
-
 			// Do no rendering if the window is minimized.
 			if (SDL_GetWindowFlags(window) & SDL_WINDOW_MINIMIZED) {
 				continue;
@@ -254,178 +300,26 @@ class Application {
 			ImGui_ImplSDLRenderer3_NewFrame();
 			ImGui_ImplSDL3_NewFrame();
 			ImGui::NewFrame();
+			
+			// ------ individual window features code here
+			ShowNodeEditor();
+			ShowMainMenuBar();
+			LeftSideMenu();
+			
 
-			// Testing-window that brings up file explorer
-			ImGui::Begin("Window A");
-			ImGui::Text("This is window A");
-			ImGui::Text("Click the button below \nto open file explorer");
-			if (ImGui::Button("Button A")) {
-				printf("Button A clicked!\n");
-				SDL_ShowOpenFileDialog(
-					callback, renderer, window, dialog_filters.data(),
-					SDL_arraysize(dialog_filters), nullptr, true);
-			}
-			ImGui::End();
-
-			// Show the original images
-			if (!original_textures.empty()) {
-				ImGui::Begin("Original textures");
-				for (const auto texture : original_textures) {
-					float width, height;  // Width and height are set below
-					SDL_GetTextureSize(texture, &width, &height);
-					ImGui::Image(texture, ImVec2(width, height));
-				}
-				if (ImGui::Button("Process images")) {
-					processImages(renderer);  // Click to manipulate images
-				}
-				ImGui::End();
-			}
-
-			// Show the result of the manipulated images
-			if (!manipulated_textures.empty()) {
-				ImGui::Begin("Manipulated textures");
-				for (const auto texture : manipulated_textures) {
-					float width, height;  // Width and height are set below
-					SDL_GetTextureSize(texture, &width, &height);
-					ImGui::Image(texture, ImVec2(width, height));
-				}
-				ImGui::End();
-			}
+			// ------ individual window features code here
 
 			// Show demo window.
 			ImGui::ShowDemoWindow();
 
-			// Node editor
-			ImGui::Begin("Node Editor");
-			// ImGui::SetWindowPos(ImVec2(20, io.DisplaySize.y - 300));
-
-			// Display FPS in the Node Editor just because it is funny
-			ImGui::Text("FPS: %d (%.2gms)", static_cast<int>(io.Framerate),
-						io.Framerate != 0 ? 1000.0f / io.Framerate : 0.0f);
-			ImGui::Separator();
-			NodeImGui::SetCurrentEditor(nodeContext);
-			NodeImGui::Begin("My Node Editor");
-
-			// Set up unique hard coded testing IDs for nodes, pins and links
-			const NodeImGui::NodeId testNode1 = 1;
-			const NodeImGui::PinId testInput1 = 2;
-			const NodeImGui::PinId testOutput1 = 3;
-			const NodeImGui::NodeId testNode2 = 4;
-			const NodeImGui::PinId testInput2 = 5;
-			const NodeImGui::PinId testOutput2 = 6;
-			const NodeImGui::NodeId testNode3 = 7;
-			const NodeImGui::PinId testInput3 = 8;
-			const NodeImGui::PinId testOutput3 = 9;
-
-			// Create Node 1
-			NodeImGui::BeginNode(testNode1);
-			ImGui::Text("Test Node 1");
-
-			// Create Input pin for Node 1
-			NodeImGui::BeginPin(testInput1, NodeImGui::PinKind::Input);
-			ImGui::Text("-> Input");
-			NodeImGui::EndPin();
-
-			// Create Output pin for Node 1
-			ImGui::SameLine();	// Place Output next to Input instead of under
-			NodeImGui::BeginPin(testOutput1, NodeImGui::PinKind::Output);
-			ImGui::Text("Output ->");
-			NodeImGui::EndPin();
-
-			ImGui::Button("A button that\ndoes absolutely\nnothing");
-			// Close Node 1
-			NodeImGui::EndNode();
-
-			// Create Node 2
-			NodeImGui::BeginNode(testNode2);
-			ImGui::Text("Test Node 2");
-
-			// Create Input pin for Node 2
-			NodeImGui::BeginPin(testInput2, NodeImGui::PinKind::Input);
-			ImGui::Text("-> Input");
-			NodeImGui::EndPin();
-
-			// Create Output pin for Node 2
-			ImGui::SameLine();	// Place Output next to Input instead of under
-			NodeImGui::BeginPin(testOutput2, NodeImGui::PinKind::Output);
-			ImGui::Text("Output ->");
-			NodeImGui::EndPin();
-
-			// Close Node 2
-			NodeImGui::EndNode();
-
-			// Create Node 3
-			NodeImGui::BeginNode(testNode3);
-			ImGui::Text("Test Node 3");
-
-			// Create Input pin for Node 1
-			NodeImGui::BeginPin(testInput3, NodeImGui::PinKind::Input);
-			ImGui::Text("-> Input");
-			NodeImGui::EndPin();
-
-			// Create Output pin for Node 3
-			ImGui::SameLine();	// Place Output next to Input instead of under
-			NodeImGui::BeginPin(testOutput3, NodeImGui::PinKind::Output);
-			ImGui::Text("Output ->");
-			NodeImGui::EndPin();
-
-			// Close Node 3
-			NodeImGui::EndNode();
-
-			if (NodeImGui::BeginCreate()) {
-				NodeImGui::PinId inputPin, outputPin;
-				if (NodeImGui::QueryNewLink(&inputPin, &outputPin)) {
-					if (inputPin && outputPin && NodeImGui::AcceptNewItem()) {
-						Link link;
-						link.id = uniqueId++;
-						link.startPin = inputPin;
-						link.endPin = outputPin;
-						printf("Link Created: %d -> %d with ID %d \n",
-							   static_cast<int>(link.startPin.Get()),
-							   static_cast<int>(link.endPin.Get()),
-							   static_cast<int>(link.id.Get()));
-						links.push_back(link);
-						// NodeImGui::Link(testLink2, outputPin, inputPin);
-					}
-				}
-				NodeImGui::EndCreate();
-			}
-
-			if (NodeImGui::BeginDelete()) {
-				NodeImGui::LinkId deletedLinkId;
-				while (NodeImGui::QueryDeletedLink(&deletedLinkId)) {
-					if (NodeImGui::AcceptDeletedItem()) {
-						for (auto& link : links) {
-							if (link.id == deletedLinkId) {
-								links.erase(&link);
-								printf("Link Deleted: %d\n",
-									   static_cast<int>(deletedLinkId.Get()));
-								break;
-							}
-						}
-					}
-				}
-				NodeImGui::EndDelete();
-			}
-
-			// Render links
-			for (auto& [id, startPin, endPin] : links) {
-				NodeImGui::Link(id, startPin, endPin);
-			}
-
-			// Close Node editor
-			NodeImGui::End();
-			NodeImGui::SetCurrentEditor(nullptr);
-			ImGui::End();
-
 			// Render the ImGui frame.
 			ImGui::Render();
 			SDL_SetRenderScale(renderer, io.DisplayFramebufferScale.x,
-							   io.DisplayFramebufferScale.y);
+								io.DisplayFramebufferScale.y);
 			SDL_SetRenderDrawColorFloat(renderer, 0, 0, 0, 0);
 			SDL_RenderClear(renderer);
 			ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(),
-												  renderer);
+													renderer);
 			SDL_RenderPresent(renderer);
 		}
 	}
@@ -459,18 +353,15 @@ class Application {
 };
 
 int main() {
-	constexpr int INITIAL_WINDOW_WIDTH = 960;
-	constexpr int INITIAL_WINDOW_HEIGHT = 540;
-
 	Application application = Application(
-		INITIAL_WINDOW_WIDTH, INITIAL_WINDOW_HEIGHT, "I am a window :3");
+		"DD1367 Compression & Texturepacking Node Editor :3");
 
 	// Check for initialization errors before running.
 	if (application.get_status() != SUCCESS) {
 		return application.get_status();
 	}
 
-	application.run();
+	application.GUI_experimenting();
 
 	return application.get_status();
 }
