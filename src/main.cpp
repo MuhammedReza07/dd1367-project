@@ -113,14 +113,14 @@ static void processImages(SDL_Renderer* renderer) {
 
 // Because RAII is pretty nice <3
 class Application {
-   private:
+    private:
 	ApplicationStatus status;
 	float scale;
 	std::string window_title;
 	SDL_Window* window;
 	SDL_Renderer* renderer;
 
-   public:
+    public:
 	/**
 	Initialize the application with the provided window dimensions and title.
 
@@ -185,25 +185,112 @@ class Application {
 	ImVector<Link> links;
 	int uniqueId = 1;
 
+	// menu for handling the nodestuff. You should be able to select different node types, also handle settings of individual nodes
+	void LeftSideMenu() {
+		ImGuiViewport* viewport = ImGui::GetMainViewport();
+		float menuBarHeight = ImGui::GetFrameHeight();
+		ImGui::SetNextWindowPos(ImVec2(viewport->Pos.x, viewport->Pos.y + menuBarHeight));
+		ImGui::SetNextWindowSize(ImVec2(viewport->Size.x/4, viewport->Size.y - menuBarHeight));
+		ImGui::SetNextWindowViewport(viewport->ID);
+		ImGui::Begin("Window A", nullptr,
+					 ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove |
+						 ImGuiWindowFlags_NoResize |
+							 ImGuiWindowFlags_NoBringToFrontOnFocus);
+		
+		
+		// RESET BUTTON STARTS HERE
+		if (ImGui::Button("Reset")) ImGui::OpenPopup("Reset?");
 
-	// menu for handling the nodestuff
-	static void LeftSideMenu() {
-		ImGui::Begin("Window A", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize);
-		if (ImGui::CollapsingHeader("Options 1")) {
+		// Always center this window when appearing
+		ImVec2 center = ImGui::GetMainViewport()->GetCenter();
+		ImGui::SetNextWindowPos(center, ImGuiCond_Appearing,
+								ImVec2(0.5f, 0.5f));
+
+		if (ImGui::BeginPopupModal("Reset?", NULL,
+								   ImGuiWindowFlags_AlwaysAutoResize)) {
+			ImGui::Text(
+				"The node graph and all related settings will be reset.\nThis operation "
+				"cannot be undone.");
+			ImGui::Separator();
+
+			// static int unused_i = 0;
+			// ImGui::Combo("Combo", &unused_i, "Delete\0Delete harder\0");
+
+			static bool dont_ask_me_next_time = false;
+			ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
+			ImGui::Checkbox("Don't ask me next time", &dont_ask_me_next_time);
+			ImGui::PopStyleVar();
+
+			if (ImGui::Button("OK", ImVec2(120, 0))) {
+				ImGui::CloseCurrentPopup();
+			}
+			ImGui::SetItemDefaultFocus();
+			ImGui::SameLine();
+			if (ImGui::Button("Cancel", ImVec2(120, 0))) {
+				ImGui::CloseCurrentPopup();
+			}
+			ImGui::EndPopup();
 		}
-		if (ImGui::CollapsingHeader("Options 2")) {
+		// RESET BUTTON ENDS HERE
+
+
+		// OTHER BUTTONS (THEY DO NOT WORK)
+		ImGui::SameLine();
+		bool butt_2 = ImGui::Button("Load Preset");
+		ImGui::SameLine();
+		bool butt_3 = ImGui::Button("Save Preset");
+		ImGui::Dummy(ImVec2(0.0f, 10.0f));
+		// COLAPSING HEADERS START HERE
+		if (ImGui::CollapsingHeader("Node handler")) {
+			ImGui::SeparatorText("IO Nodes");
+			bool nodebutt_1 = ImGui::Button("Add node 1");
+			ImGui::SeparatorText("Compressor Nodes");
+			bool nodebutt_2 = ImGui::Button("Add node 2");
+			ImGui::SeparatorText("IO Nodes");
+			bool nodebutt_3 = ImGui::Button("Add node 3");
+			ImGui::SeparatorText("Something Something RGB Nodes");
+			bool nodebutt_4 = ImGui::Button("Add node 4");
 		}
-		if (ImGui::CollapsingHeader("Options 3")) {
+		if (ImGui::CollapsingHeader("Mipmap Options")) {
 		}
-		if (ImGui::CollapsingHeader("Options 4")) {
+		if (ImGui::CollapsingHeader("Effects")) {
 		}
-		if (ImGui::CollapsingHeader("Options 5")) {
+		if (ImGui::CollapsingHeader("Image Options")) {
 		}
-		ImGui::Text("In this big space below vvvv I think you could have like a pop-up type window where you can change the attributes of a node? since it might get messy if it happens in the node gra");
+		if (ImGui::CollapsingHeader("Compression Settings")) {
+		}
+
+		ImGui::Dummy(ImVec2(0.0f, 10.0f)); // cute spacing between drop downs and file loading button
+		// THE OG IMAGE MANPIPULATOR WINDOW vvv 
+		
+		// Testing-window that brings up file explorer
+		if (ImGui::Button("File explore tester (also display image)")) {
+			printf("Button A clicked!\n");
+			SDL_ShowOpenFileDialog(
+				callback, renderer, window, dialog_filters.data(),
+				SDL_arraysize(dialog_filters), nullptr, true);
+		}
+
+		// Show the original images
+		if (!original_textures.empty()) {
+			for (const auto texture : original_textures) {
+				float width, height;  // Width and height are set below
+				SDL_GetTextureSize(texture, &width, &height);
+				float scaleFactor =  ImGui::GetContentRegionAvail().x / width;
+				ImVec2 scaledSize(width * scaleFactor,
+								  height * scaleFactor);  // Scale down the image
+				ImGui::Image(texture,  scaledSize);
+			}
+			if (ImGui::Button("Process images (this does not work)")) {
+				processImages(renderer);  // Click to manipulate images
+			}
+		}
+
+		
 		ImGui::End();
 	}
 
-	// menu for handling "projects"? like saving graphs, and idk. it's the main menu bar, like the one you usually see in apps
+	// menu for handling "projects"? like saving graphs, and idk. it's the top main menu bar, like the one you usually see in apps
 	static void ShowMainMenuBar() {
 		if (ImGui::BeginMainMenuBar()) {
 			if (ImGui::BeginMenu("File")) {
@@ -222,7 +309,7 @@ class Application {
 		}
 	}
 
-void ShowNodeEditor() {
+	void ShowNodeEditor() {
 		// Setup ImGui Node Editor context
 		static NodeImGui::EditorContext* nodeContext = nullptr;
 		if (!nodeContext) {
@@ -232,8 +319,17 @@ void ShowNodeEditor() {
 		}
 
 		// Node editor
-		if (ImGui::Begin("Node Editor", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize)) {
-			ImGui::Text("Panning in the canvas space doesn't work :/  probably something to do with how the nodestuff is set up idk");
+		ImGuiViewport* viewport = ImGui::GetMainViewport();
+		float menuBarHeight = ImGui::GetFrameHeight();
+		ImGui::SetNextWindowPos(
+			ImVec2(viewport->Size.x - viewport->Size.x * 3 / 4,
+				   viewport->Pos.y + menuBarHeight));
+		ImGui::SetNextWindowSize(ImVec2(viewport->Size.x * 3 / 4, viewport->Size.y - menuBarHeight));
+		ImGui::SetNextWindowViewport(viewport->ID);
+		if (ImGui::Begin("Node Editor", nullptr,
+						 ImGuiWindowFlags_NoTitleBar |
+							 ImGuiWindowFlags_NoResize |
+								 ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoMove)) {
 			NodeImGui::SetCurrentEditor(nodeContext);
 			ImVec2 size = ImGui::GetContentRegionAvail();
 				NodeImGui::Begin("My Node Editor", size);
@@ -305,7 +401,6 @@ void ShowNodeEditor() {
 			ShowNodeEditor();
 			ShowMainMenuBar();
 			LeftSideMenu();
-			
 
 			// ------ individual window features code here
 
@@ -314,8 +409,7 @@ void ShowNodeEditor() {
 
 			// Render the ImGui frame.
 			ImGui::Render();
-			SDL_SetRenderScale(renderer, io.DisplayFramebufferScale.x,
-								io.DisplayFramebufferScale.y);
+			SDL_SetRenderScale(renderer, io.DisplayFramebufferScale.x,io.DisplayFramebufferScale.y);
 			SDL_SetRenderDrawColorFloat(renderer, 0, 0, 0, 0);
 			SDL_RenderClear(renderer);
 			ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(),
