@@ -120,6 +120,20 @@ class Application {
 	SDL_Window* window;
 	SDL_Renderer* renderer;
 
+	NodeImGui::EditorContext* nodeContext = nullptr;
+	struct Link {
+		NodeImGui::LinkId id;
+		NodeImGui::PinId startPin;
+		NodeImGui::PinId endPin;
+	};
+	struct Node {
+		NodeImGui::NodeId id;
+		ImVector<NodeImGui::PinId> inputs;
+		ImVector<NodeImGui::PinId> outputs;
+	};
+	ImVector<Link> links;
+	int uniqueId = 1;
+
     public:
 	/**
 	Initialize the application with the provided window dimensions and title.
@@ -176,14 +190,10 @@ class Application {
 	*/
 	ApplicationStatus get_status() { return status; }
 
-	NodeImGui::EditorContext* nodeContext = nullptr;
-	struct Link {
-		NodeImGui::LinkId id;
-		NodeImGui::PinId startPin;
-		NodeImGui::PinId endPin;
-	};
-	ImVector<Link> links;
-	int uniqueId = 1;
+	private:
+	void CreateNode() {
+		// create a node onto our graph 
+	}
 
 	// menu for handling the nodestuff. You should be able to select different node types, also handle settings of individual nodes
 	void LeftSideMenu() {
@@ -243,7 +253,9 @@ class Application {
 		// COLAPSING HEADERS START HERE
 		if (ImGui::CollapsingHeader("Node handler")) {
 			ImGui::SeparatorText("IO Nodes");
-			bool nodebutt_1 = ImGui::Button("Add node 1");
+			if (ImGui::Button("Add node 1")){
+				CreateNode();
+			}
 			ImGui::SeparatorText("Compressor Nodes");
 			bool nodebutt_2 = ImGui::Button("Add node 2");
 			ImGui::SeparatorText("IO Nodes");
@@ -321,27 +333,25 @@ class Application {
 		// Node editor
 		ImGuiViewport* viewport = ImGui::GetMainViewport();
 		float menuBarHeight = ImGui::GetFrameHeight();
-		ImGui::SetNextWindowPos(
-			ImVec2(viewport->Size.x - viewport->Size.x * 3 / 4,
-				   viewport->Pos.y + menuBarHeight));
+		ImGui::SetNextWindowPos(ImVec2(viewport->Size.x - viewport->Size.x * 3 / 4, viewport->Pos.y + menuBarHeight));
 		ImGui::SetNextWindowSize(ImVec2(viewport->Size.x * 3 / 4, viewport->Size.y - menuBarHeight));
 		ImGui::SetNextWindowViewport(viewport->ID);
-		if (ImGui::Begin("Node Editor", nullptr,
-						 ImGuiWindowFlags_NoTitleBar |
-							 ImGuiWindowFlags_NoResize |
-								 ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoMove)) {
+		if (ImGui::Begin("Node Editor", nullptr,ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoMove)) {
+			
 			NodeImGui::SetCurrentEditor(nodeContext);
 			ImVec2 size = ImGui::GetContentRegionAvail();
 				NodeImGui::Begin("My Node Editor", size);
 				NodeImGui::End();
 			NodeImGui::SetCurrentEditor(nullptr);
+
 			ImGui::End();
 		}
 	}
 	
+	public:
 	// This function is just for testing and experimenting with ImGui and the
 	// node editor. Testing different designs 
-	void GUI_experimenting() {
+	void run() {
 		// Show window.
 		if (SDL_ShowWindow(window) == false) {
 			SDL_Log("SDL_ShowWindow: %s", SDL_GetError());
@@ -455,7 +465,7 @@ int main() {
 		return application.get_status();
 	}
 
-	application.GUI_experimenting();
+	application.run();
 
 	return application.get_status();
 }
