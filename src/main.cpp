@@ -193,6 +193,7 @@ class Application {
 	private:
 	void CreateNode() {
 		// create a node onto our graph 
+
 	}
 
 	// menu for handling the nodestuff. You should be able to select different node types, also handle settings of individual nodes
