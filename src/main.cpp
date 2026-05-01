@@ -120,19 +120,109 @@ class Application {
 	SDL_Window* window;
 	SDL_Renderer* renderer;
 
-	NodeImGui::EditorContext* nodeContext = nullptr;
-	struct Link {
-		NodeImGui::LinkId id;
-		NodeImGui::PinId startPin;
-		NodeImGui::PinId endPin;
+	class NodeEditor {
+		NodeImGui::EditorContext* nodeContext;
+		int uniqueId = 1;
+
+	   public:
+		int uniquePinId = 1;
+		NodeImGui::NodeId spawnNodeId = 0;
+		struct Link {
+			NodeImGui::LinkId id;
+			NodeImGui::PinId startPin;
+			NodeImGui::PinId endPin;
+		};
+		struct Node {
+			NodeImGui::NodeId id;
+			ImVector<NodeImGui::PinId> inputs;
+			ImVector<NodeImGui::PinId> outputs;
+			// lägg till typ field för nod-typer?
+		};
+
+		NodeImGui::NodeId getUniqueId() {
+			return NodeImGui::NodeId(uniqueId++);
+		}
+
+		NodeImGui::PinId getUniquePinId() {
+			return NodeImGui::PinId(uniquePinId++);
+		}
+
+		NodeEditor() {
+			NodeImGui::Config config;
+			config.SettingsFile = "NodeEditor.json";
+			nodeContext = NodeImGui::CreateEditor(&config);
+		}
+
+		ImVector<Link> links;  // list for saving links between nodes
+		ImVector<Node> nodes;  // list for saving nodes
+
+		void addNode(Node node) { nodes.push_back(node); }
+
+		void addLink(Link link) { links.push_back(link); }
+
+		void removeNode(NodeImGui::NodeId nodeId) {
+			for (int i = 0; i < nodes.size(); ++i) {
+				if (nodes[i].id == nodeId) {
+					nodes.erase(nodes.begin() + i);
+					break;
+				}
+			}
+		}
+
+		void removeLink(NodeImGui::LinkId linkId) {
+			for (int i = 0; i < links.size(); ++i) {
+				if (links[i].id == linkId) {
+					links.erase(links.begin() + i);
+					break;
+				}
+			}
+		}
+
+		void cleanup() { NodeImGui::DestroyEditor(nodeContext); }
+	
+		void render() {
+			NodeImGui::SetCurrentEditor(nodeContext);
+			NodeImGui::Begin("Node Editor");
+
+			for (const auto& node : nodes) {
+				NodeImGui::BeginNode(node.id);
+
+				ImGui::Text("Node %d", node.id.Get());
+				
+				// IF YOU TRY TO ADD THE PINS, THE PROGRAM FREEZES
+				for (const auto& inputPin : node.inputs) {
+					//NodeImGui::BeginPin(inputPin, NodeImGui::PinKind::Input);
+					ImGui::Text("%d",
+								inputPin.Get());  // PRINT THE PIN ID TO CHECK
+												  // IF IT IS WORKING (IT DOES NOT)
+					//NodeImGui::EndPin();
+				}
+
+				for (const auto& outputPin : node.outputs) {
+					//NodeImGui::BeginPin(outputPin, NodeImGui::PinKind::Output);
+					ImGui::Text("%d", outputPin.Get());
+					//NodeImGui::EndPin();
+				}
+
+				NodeImGui::EndNode();
+			}
+
+
+			NodeImGui::End();
+		}
+
+		void createLink(NodeImGui::PinId startPin, NodeImGui::PinId endPin) {
+			Link newLink;
+			newLink.id = NodeImGui::LinkId(uniqueId++);
+			newLink.startPin = startPin;
+			newLink.endPin = endPin;
+			addLink(newLink);
+		}
+		
 	};
-	struct Node {
-		NodeImGui::NodeId id;
-		ImVector<NodeImGui::PinId> inputs;
-		ImVector<NodeImGui::PinId> outputs;
-	};
-	ImVector<Link> links;
-	int uniqueId = 1;
+
+	NodeEditor nodeEditor;
+
 
     public:
 	/**
@@ -192,8 +282,20 @@ class Application {
 
 	private:
 	void CreateNode() {
-		// create a node onto our graph 
+		 NodeEditor::Node node;
+		 node.id = nodeEditor.getUniqueId();
+		 
+		 for (int i = 0; i < 2; ++i) {
+			NodeImGui::PinId inputPinId = nodeEditor.getUniquePinId();
+			node.inputs.push_back(inputPinId);
+		 }
 
+		 for (int i = 0; i < 2; ++i) {
+			NodeImGui::PinId outputPinId = nodeEditor.getUniquePinId();
+			node.outputs.push_back(outputPinId);
+		 }
+
+		 nodeEditor.addNode(node);
 	}
 
 	// menu for handling the nodestuff. You should be able to select different node types, also handle settings of individual nodes
@@ -250,6 +352,11 @@ class Application {
 		bool butt_2 = ImGui::Button("Load Preset");
 		ImGui::SameLine();
 		bool butt_3 = ImGui::Button("Save Preset");
+		ImGui::SameLine();
+		if (ImGui::Button("Focus on canvas")) {
+			NodeImGui::NavigateToContent();
+		}
+
 		ImGui::Dummy(ImVec2(0.0f, 10.0f));
 		// COLAPSING HEADERS START HERE
 		if (ImGui::CollapsingHeader("Node handler")) {
@@ -323,13 +430,6 @@ class Application {
 	}
 
 	void ShowNodeEditor() {
-		// Setup ImGui Node Editor context
-		static NodeImGui::EditorContext* nodeContext = nullptr;
-		if (!nodeContext) {
-			NodeImGui::Config config;
-			config.SettingsFile = "NodeEditor.json";
-			nodeContext = NodeImGui::CreateEditor(&config);
-		}
 
 		// Node editor
 		ImGuiViewport* viewport = ImGui::GetMainViewport();
@@ -338,13 +438,11 @@ class Application {
 		ImGui::SetNextWindowSize(ImVec2(viewport->Size.x * 3 / 4, viewport->Size.y - menuBarHeight));
 		ImGui::SetNextWindowViewport(viewport->ID);
 		if (ImGui::Begin("Node Editor", nullptr,ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoMove)) {
+			ImGui::Text("Node count: %d", nodeEditor.nodes.size());
+			ImGui::SameLine();
+			ImGui::Text("Current 'unique Pin ID' : %d", nodeEditor.uniquePinId);
 			
-			NodeImGui::SetCurrentEditor(nodeContext);
-			ImVec2 size = ImGui::GetContentRegionAvail();
-				NodeImGui::Begin("My Node Editor", size);
-				NodeImGui::End();
-			NodeImGui::SetCurrentEditor(nullptr);
-
+			nodeEditor.render();  // Render the node editor
 			ImGui::End();
 		}
 	}
@@ -431,7 +529,7 @@ class Application {
 
 	~Application() {
 		// ImGui cleanup.
-		NodeImGui::DestroyEditor(nodeContext);
+		nodeEditor.cleanup();
 		ImGui_ImplSDLRenderer3_Shutdown();
 		ImGui_ImplSDL3_Shutdown();
 		ImGui::DestroyContext();
