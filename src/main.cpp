@@ -125,7 +125,6 @@ class Application {
 		int uniqueId = 1;
 
 	   public:
-		int uniquePinId = 1;
 		NodeImGui::NodeId spawnNodeId = 0;
 		struct Link {
 			NodeImGui::LinkId id;
@@ -144,7 +143,7 @@ class Application {
 		}
 
 		NodeImGui::PinId getUniquePinId() {
-			return NodeImGui::PinId(uniquePinId++);
+			return NodeImGui::PinId(uniqueId++);
 		}
 
 		NodeEditor() {
@@ -153,8 +152,8 @@ class Application {
 			nodeContext = NodeImGui::CreateEditor(&config);
 		}
 
-		ImVector<Link> links;  // list for saving links between nodes
-		ImVector<Node> nodes;  // list for saving nodes
+		std::vector<Node> nodes;
+		std::vector<Link> links;
 
 		void addNode(Node node) { nodes.push_back(node); }
 
@@ -187,26 +186,62 @@ class Application {
 			for (const auto& node : nodes) {
 				NodeImGui::BeginNode(node.id);
 
-				ImGui::Text("Node %d", node.id.Get());
+				ImGui::Text("Node - ID: %d", node.id.Get());
 				
 				// IF YOU TRY TO ADD THE PINS, THE PROGRAM FREEZES
 				for (const auto& inputPin : node.inputs) {
-					//NodeImGui::BeginPin(inputPin, NodeImGui::PinKind::Input);
-					ImGui::Text("%d",
-								inputPin.Get());  // PRINT THE PIN ID TO CHECK
-												  // IF IT IS WORKING (IT DOES NOT)
-					//NodeImGui::EndPin();
+					NodeImGui::BeginPin(inputPin, NodeImGui::PinKind::Input);
+					ImGui::Text("-> In");
+					NodeImGui::EndPin();
+				}
+				for (const auto& outputPin : node.outputs) {
+					NodeImGui::BeginPin(outputPin, NodeImGui::PinKind::Output);
+					ImGui::Text("<- Out");
+					NodeImGui::EndPin();
 				}
 
-				for (const auto& outputPin : node.outputs) {
-					//NodeImGui::BeginPin(outputPin, NodeImGui::PinKind::Output);
-					ImGui::Text("%d", outputPin.Get());
-					//NodeImGui::EndPin();
+				for (const auto& link : links) {
+					NodeImGui::Link(link.id, link.startPin, link.endPin);
 				}
 
 				NodeImGui::EndNode();
 			}
 
+			// Create new links between pins
+			if (NodeImGui::BeginCreate()) {
+				NodeImGui::PinId inputPin, outputPin;
+				if (NodeImGui::QueryNewLink(&inputPin, &outputPin)) {
+					if (inputPin && outputPin && NodeImGui::AcceptNewItem()) {
+						Link link;
+						link.id = uniqueId++;
+						link.startPin = inputPin;
+						link.endPin = outputPin;
+						printf("Link Created: %d -> %d with ID %d \n",
+							   static_cast<int>(link.startPin.Get()),
+							   static_cast<int>(link.endPin.Get()),
+							   static_cast<int>(link.id.Get()));
+						links.push_back(link);
+						// NodeImGui::Link(testLink2, outputPin, inputPin);
+					}
+				}
+				NodeImGui::EndCreate();
+			}
+
+			// Delete links and nodes
+			if (NodeImGui::BeginDelete()) {
+				NodeImGui::LinkId linkId;
+				while (NodeImGui::QueryDeletedLink(&linkId)) {
+					if (NodeImGui::AcceptDeletedItem()) {
+						removeLink(linkId);
+					}
+				}
+				NodeImGui::NodeId nodeId;
+				while (NodeImGui::QueryDeletedNode(&nodeId)) {
+					if (NodeImGui::AcceptDeletedItem()) {
+						removeNode(nodeId);
+					}
+				}
+			}
 
 			NodeImGui::End();
 		}
@@ -217,6 +252,12 @@ class Application {
 			newLink.startPin = startPin;
 			newLink.endPin = endPin;
 			addLink(newLink);
+		}
+
+		void reset() {
+			nodes.clear();
+			links.clear();
+			uniqueId = 1;
 		}
 		
 	};
@@ -325,16 +366,13 @@ class Application {
 				"The node graph and all related settings will be reset.\nThis operation "
 				"cannot be undone.");
 			ImGui::Separator();
-
-			// static int unused_i = 0;
-			// ImGui::Combo("Combo", &unused_i, "Delete\0Delete harder\0");
-
 			static bool dont_ask_me_next_time = false;
 			ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
 			ImGui::Checkbox("Don't ask me next time", &dont_ask_me_next_time);
 			ImGui::PopStyleVar();
 
 			if (ImGui::Button("OK", ImVec2(120, 0))) {
+				nodeEditor.reset();
 				ImGui::CloseCurrentPopup();
 			}
 			ImGui::SetItemDefaultFocus();
@@ -353,7 +391,7 @@ class Application {
 		ImGui::SameLine();
 		bool butt_3 = ImGui::Button("Save Preset");
 		ImGui::SameLine();
-		if (ImGui::Button("Focus on canvas")) {
+		if (ImGui::Button("Center on graph")) {
 			NodeImGui::NavigateToContent();
 		}
 
@@ -389,6 +427,11 @@ class Application {
 			SDL_ShowOpenFileDialog(
 				callback, renderer, window, dialog_filters.data(),
 				SDL_arraysize(dialog_filters), nullptr, true);
+		}
+
+		ImGui::Dummy(ImVec2(0.0f, 10.0f));
+		if (ImGui::Button("Add node for testing")) {
+			CreateNode();
 		}
 
 		// Show the original images
@@ -439,9 +482,6 @@ class Application {
 		ImGui::SetNextWindowViewport(viewport->ID);
 		if (ImGui::Begin("Node Editor", nullptr,ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoMove)) {
 			ImGui::Text("Node count: %d", nodeEditor.nodes.size());
-			ImGui::SameLine();
-			ImGui::Text("Current 'unique Pin ID' : %d", nodeEditor.uniquePinId);
-			
 			nodeEditor.render();  // Render the node editor
 			ImGui::End();
 		}
