@@ -135,7 +135,9 @@ class Application {
 			NodeImGui::NodeId id;
 			ImVector<NodeImGui::PinId> inputs;
 			ImVector<NodeImGui::PinId> outputs;
-			// lägg till typ field för nod-typer?
+
+			// ok på något sätt måste nodes lagra data om typ bilder/textures som finns i inputnoder, och vilka effekter olika effektnoder har
+
 		};
 
 		NodeImGui::NodeId getUniqueId() {
@@ -322,6 +324,8 @@ class Application {
 	ApplicationStatus get_status() { return status; }
 
 	private:
+	// Function to create a node with 2 input pins and 2 outputs, has no
+	// specific type, just a generic node for testing
 	void CreateNode() {
 		 NodeEditor::Node node;
 		 node.id = nodeEditor.getUniqueId();
@@ -337,6 +341,24 @@ class Application {
 		 }
 
 		 nodeEditor.addNode(node);
+	}
+
+	void CreateInputNode() {
+		NodeEditor::Node node;
+		node.id = nodeEditor.getUniqueId();
+		NodeImGui::PinId outputPinId = nodeEditor.getUniquePinId();
+		node.outputs.push_back(outputPinId);
+		nodeEditor.addNode(node);
+	}
+
+	static void HelpMarker(const char* desc) {
+		ImGui::TextDisabled("(?)");
+		if (ImGui::BeginItemTooltip()) {
+			ImGui::PushTextWrapPos(ImGui::GetFontSize() * 35.0f);
+			ImGui::TextUnformatted(desc);
+			ImGui::PopTextWrapPos();
+			ImGui::EndTooltip();
+		}
 	}
 
 	// menu for handling the nodestuff. You should be able to select different node types, also handle settings of individual nodes
@@ -397,26 +419,185 @@ class Application {
 
 		ImGui::Dummy(ImVec2(0.0f, 10.0f));
 		// COLAPSING HEADERS START HERE
-		if (ImGui::CollapsingHeader("Node handler")) {
-			ImGui::SeparatorText("IO Nodes");
-			if (ImGui::Button("Add node 1")){
+		if (ImGui::CollapsingHeader("IO")) {
+			ImGui::Dummy(ImVec2(0.0f, 10.0f));
+			if (ImGui::Button("Create Input Node")){
+				CreateInputNode();
+			} 
+			ImGui::SameLine();
+			HelpMarker(
+				"This node will be used to load images into the graph. You can "
+				"load multiple images at once, and they will be processed in "
+				"parallel.");
+			ImGui::Dummy(ImVec2(0.0f, 10.0f));
+			if (ImGui::Button("Create Output Node")) {
 				CreateNode();
 			}
-			ImGui::SeparatorText("Compressor Nodes");
-			bool nodebutt_2 = ImGui::Button("Add node 2");
-			ImGui::SeparatorText("IO Nodes");
-			bool nodebutt_3 = ImGui::Button("Add node 3");
-			ImGui::SeparatorText("Something Something RGB Nodes");
-			bool nodebutt_4 = ImGui::Button("Add node 4");
+			ImGui::SameLine();
+			HelpMarker(
+				"This node will be used to view the processed images. You can "
+				"save multiple images at once, and they will be processed in "
+				"parallel.");
+			ImGui::Dummy(ImVec2(0.0f, 10.0f));
+
+			ImGui::SeparatorText("Options");
+			// vet inte riktigt vad som ska vara här
 		}
-		if (ImGui::CollapsingHeader("Mipmap Options")) {
+		if (ImGui::CollapsingHeader("Mipmap")) {
+			ImGui::Dummy(ImVec2(0.0f, 10.0f));
+			if (ImGui::Button("Create MipMap Node")) {
+			} 
+			ImGui::SameLine();
+			HelpMarker(
+				"This node will be used to generate mipmaps for the input images. "
+				"You can choose the number of mipmap levels to generate, and the "
+				"filtering method to use.");
+			ImGui::SeparatorText("Options");
+
 		}
 		if (ImGui::CollapsingHeader("Effects")) {
-		}
-		if (ImGui::CollapsingHeader("Image Options")) {
+			ImGui::Dummy(ImVec2(0.0f, 10.0f));
+			ImGui::BeginChild( "ChildR", ImVec2(0, 160));
+				if (ImGui::BeginTable("Effects' table", 1)) {
+					ImGui::TableNextColumn();
+
+					if (ImGui::Button("2D Convolution")) {} 
+
+					if (ImGui::Button("Negative")) {}
+
+					if (ImGui::Button("Lighter")) {}
+
+					if (ImGui::Button("Darker")) {
+					}
+
+					if (ImGui::Button("Contrast More")) {
+					}
+					
+					if (ImGui::Button("Contrast Less")) {
+					}
+					
+					if (ImGui::Button("Smooth")) {
+					}
+					
+					if (ImGui::Button("Sharpen Soft")) {
+					}
+					
+					if (ImGui::Button("Sharpen Medium")) {
+					}
+					
+					if (ImGui::Button("Sharpen Strong")) {
+					}
+					
+					if (ImGui::Button("Find Edges")) {
+					}
+					
+					if (ImGui::Button("Contour")) {
+					}
+					
+					if (ImGui::Button("Edge Detect")) {
+					}
+					
+					if (ImGui::Button("Edge Detect Soft")) {
+					}
+					
+					if (ImGui::Button("Emboss")) {
+					}
+					
+					if (ImGui::Button("Gaussian Blur")) {
+					}
+					
+					if (ImGui::Button("Adjust Contrast")) {
+					}
+					
+					if (ImGui::Button("Unsharp Mask")) {
+					}
+					
+					if (ImGui::Button("Super-Resolution")) {
+					}
+					
+					if (ImGui::Button("sRGB to Linear")) {
+					}
+					
+					if (ImGui::Button("Linear to sRGB")) {
+					}
+					
+					if (ImGui::Button("Edge Pad (Solidify)")) {
+					}
+					
+					if (ImGui::Button("Resize")) {
+					}
+					
+					if (ImGui::Button("Swizzle")) {
+					}
+					
+					ImGui::EndTable();
+				}
+			ImGui::EndChild();
+			ImGui::Dummy(ImVec2(0.0f, 10.0f));
 		}
 		if (ImGui::CollapsingHeader("Compression Settings")) {
+			ImGui::Dummy(ImVec2(0.0f, 10.0f));
+			ImGui::BeginChild("ChildC", ImVec2(0, 160));
+			if (ImGui::BeginTable("Compression table", 1)) {
+				ImGui::TableNextColumn();
+				if (ImGui::Button("BC7")) {
+				}
+				if (ImGui::Button("BC6S")) {
+				}
+				if (ImGui::Button("ASTC")) {
+				}
+
+				if (ImGui::Button("BC3")) {
+				}
+
+				if (ImGui::Button("BC1")) {
+				}
+
+				if (ImGui::Button("8")) {
+				}
+
+				if (ImGui::Button("USTC")) {
+				}
+
+				if (ImGui::Button("Och så vidare..")) {
+				}
+
+				ImGui::EndTable();
+				ImGui::EndChild();
+				ImGui::Dummy(ImVec2(0.0f, 10.0f));
+			}
 		}
+		if (ImGui::CollapsingHeader("Image Options")){
+			ImGui::Dummy(ImVec2(0.0f, 10.0f));
+			if (ImGui::Button("Color Map")) {
+			}
+			ImGui::SameLine();
+			HelpMarker(
+				"Saves the image as a color texture; does not convert to "
+				"grayscale or normal map.");
+			if (ImGui::Button("Grayscale")) {
+			}
+			ImGui::SameLine();
+			HelpMarker("Converts the image to grayscale");
+			if (ImGui::Button("Normal Map: Tangent Space")) {
+			}
+			ImGui::SameLine();
+			HelpMarker(
+				"Converts the image to a tangent-space normal map: exports "
+				"the normal vector (x y z) as the color (0.5*x + 0.5, "
+				"0.5*y + 0.5 , 0.5*z + 0.5)");
+			if (ImGui::Button("Normal Map: Object Space")) {
+			}
+			ImGui::SameLine();
+			HelpMarker(
+				"Converts the image to an object-space normal map: exports "
+				"the normal vector (x y z) as the color (saknas text) and "
+				"can apply cube map coordinate space onversion if the "
+				"image is a cube map");
+		}
+
+		ImGui::Dummy(ImVec2(0.0f, 10.0f));
+		ImGui::SeparatorText("Testing stuff below");
 
 		ImGui::Dummy(ImVec2(0.0f, 10.0f)); // cute spacing between drop downs and file loading button
 		// THE OG IMAGE MANPIPULATOR WINDOW vvv 
@@ -436,14 +617,13 @@ class Application {
 
 		// Show the original images
 		if (!original_textures.empty()) {
-			for (const auto texture : original_textures) {
-				float width, height;  // Width and height are set below
-				SDL_GetTextureSize(texture, &width, &height);
-				float scaleFactor =  ImGui::GetContentRegionAvail().x / width;
-				ImVec2 scaledSize(width * scaleFactor,
-								  height * scaleFactor);  // Scale down the image
-				ImGui::Image(texture,  scaledSize);
-			}
+			// Get the last image in the vector and display it
+			float width, height;  // Width and height are set below
+			SDL_GetTextureSize(original_textures.back(), &width, &height);
+			float scaleFactor =  ImGui::GetContentRegionAvail().x / width;
+			ImVec2 scaledSize(width * scaleFactor,
+								height * scaleFactor);  // Scale down the image
+			ImGui::Image(original_textures.back(), scaledSize);
 			if (ImGui::Button("Process images (this does not work)")) {
 				processImages(renderer);  // Click to manipulate images
 			}
@@ -459,13 +639,26 @@ class Application {
 			if (ImGui::BeginMenu("File")) {
 				ImGui::EndMenu();
 			}
-			if (ImGui::BeginMenu("Edit")) {
-				ImGui::EndMenu();
-			}
+
 			if (ImGui::BeginMenu("View")) {
+				if (ImGui::BeginMenu("Theme")) {
+					if (ImGui::MenuItem("Classic")) {
+						ImGui::StyleColorsClassic();
+					};
+					if (ImGui::MenuItem("Light")) {
+						ImGui::StyleColorsLight();
+					};
+					if (ImGui::MenuItem("Dark")) {
+						ImGui::StyleColorsDark();
+					};
+					ImGui::EndMenu();
+				}
 				ImGui::EndMenu();
 			}
+
 			if (ImGui::BeginMenu("Help")) {
+				ImGui::MenuItem("Github: "); 
+				//fixa länk typ?
 				ImGui::EndMenu();
 			}
 			ImGui::EndMainMenuBar();
@@ -482,6 +675,11 @@ class Application {
 		ImGui::SetNextWindowViewport(viewport->ID);
 		if (ImGui::Begin("Node Editor", nullptr,ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoMove)) {
 			ImGui::Text("Node count: %d", nodeEditor.nodes.size());
+			if (ImGui::IsMousePosValid()) {
+				ImGui::SameLine();
+				ImGui::Text("             Mouse pos: (%g, %g)", ImGui::GetIO().MousePos.x,
+							ImGui::GetIO().MousePos.y);
+			}
 			nodeEditor.render();  // Render the node editor
 			ImGui::End();
 		}
@@ -547,6 +745,7 @@ class Application {
 			ImGui::NewFrame();
 			
 			// ------ individual window features code here
+			ImGui::StyleColorsClassic();
 			ShowNodeEditor();
 			ShowMainMenuBar();
 			LeftSideMenu();
