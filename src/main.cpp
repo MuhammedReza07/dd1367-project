@@ -272,7 +272,7 @@ class Application {
 	@return An `Application` object. Make sure to call `get_status()` on the
 	returned object before using it to find out if initialization has failed!
 	*/
-	Application(const std::string& window_title)
+	explicit Application(const std::string& window_title)
 		: status{SUCCESS}, scale{}, window_title(window_title) {
 		// Initialize SDL.
 		if (SDL_Init(SDL_INIT_VIDEO) == false) {
