@@ -745,7 +745,7 @@ class Application {
 			ImGui::NewFrame();
 			
 			// ------ individual window features code here
-			ImGui::StyleColorsClassic();
+		
 			ShowNodeEditor();
 			ShowMainMenuBar();
 			LeftSideMenu();
