@@ -188,7 +188,7 @@ class Application {
 			for (const auto& node : nodes) {
 				NodeImGui::BeginNode(node.id);
 
-				ImGui::Text("Node - ID: %d", node.id.Get());
+				ImGui::Text("Node - ID: %lu", node.id.Get());
 
 				// IF YOU TRY TO ADD THE PINS, THE PROGRAM FREEZES
 				for (const auto& inputPin : node.inputs) {
@@ -687,7 +687,7 @@ class Application {
 							 ImGuiWindowFlags_NoResize |
 							 ImGuiWindowFlags_NoBringToFrontOnFocus |
 							 ImGuiWindowFlags_NoMove)) {
-			ImGui::Text("Node count: %d", nodeEditor.nodes.size());
+			ImGui::Text("Node count: %lu", nodeEditor.nodes.size());
 			if (ImGui::IsMousePosValid()) {
 				ImGui::SameLine();
 				ImGui::Text("             Mouse pos: (%g, %g)",
