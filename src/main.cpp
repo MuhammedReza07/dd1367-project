@@ -124,20 +124,193 @@ class Application {
 		NodeImGui::EditorContext* nodeContext;
 		int uniqueId = 1;
 
-	   public:
+	    public:
 		NodeImGui::NodeId spawnNodeId = 0;
 		struct Link {
 			NodeImGui::LinkId id;
 			NodeImGui::PinId startPin;
 			NodeImGui::PinId endPin;
 		};
-		struct Node {
+
+		class Node {
+		    public:
 			NodeImGui::NodeId id;
 			ImVector<NodeImGui::PinId> inputs;
 			ImVector<NodeImGui::PinId> outputs;
+			SDL_Texture* texture =
+				{};	 // the image that is being processed by this node (should
+					 // update between nodes?)
+			bool isInputNode = false;
+			bool isOutputNode = false;
 
-			// ok på något sätt måste nodes lagra data om typ bilder/textures
-			// som finns i inputnoder, och vilka effekter olika effektnoder har
+			void setTexture(SDL_Texture* newTexture) { texture = newTexture; }
+
+			virtual void process() {
+				// implement specific processing logic for different nodes
+			}
+		};
+
+		class InputNode : public Node {
+			void process() {
+			}
+		};
+
+		class OutputNode : public Node {
+
+			void process() {}
+		};
+
+		class MipMapNode : public Node {
+			int mipmapLevels;
+			void process() {
+			
+			}
+		};
+
+		class EffectNode : public Node {
+			enum EffectType {
+				TWOD_Convolution, 
+				Negative,
+				Lighter,
+				Darker,
+				Contrast_More,
+				Contrast_Less,
+				Smooth,
+				Sharpen_Soft,
+				Sharpen_Medium,
+				Sharpen_Strong,
+				Find_Edges,
+				Contour,
+				Edge_Detect,
+				Edge_Detect_Soft,
+				Emboss,
+				Gaussian_Blur,
+				Adjust_Contrast,
+				Unsharp_Mask,
+				Super_Resolution,
+				sRGB_to_Linear,
+				Linear_to_sRGB,
+				Edge_Pad,
+				Resize,
+				Swizzle
+			};
+			EffectType effectType;
+
+			// now depending on what effecttype a specific node object has, perform different operations on the image
+			void process() {
+				switch (effectType) {
+					case TWOD_Convolution:
+						// perform 2D convolution on the image
+						break;
+					case Negative:
+						// perform negative effect on the image
+						break;
+					case Lighter:
+						// perform lighter effect on the image
+						break;
+					case Darker:
+						// perform darker effect on the image
+						break;
+					case Contrast_More:
+						// perform contrast more effect on the image
+						break;
+					case Contrast_Less:
+						// perform contrast less effect on the image
+						break;
+					case Smooth:
+						// perform smooth effect on the image
+						break;
+					case Sharpen_Soft:
+						// perform sharpen soft effect on the image
+						break;
+					case Sharpen_Medium:
+						// perform sharpen medium effect on the image
+						break;
+					case Sharpen_Strong:
+						// perform sharpen strong effect on the image
+						break;
+					case Find_Edges:
+						// perform find edges effect on the image
+						break;
+					case Contour:
+						// perform contour effect on the image
+						break;
+					case Edge_Detect:
+						// perform edge detect effect on the image
+						break;
+					case Edge_Detect_Soft:
+						// perform edge detect soft effect on the image
+						break;
+					case Emboss:
+						// perform emboss effect on the image
+						break;
+					case Gaussian_Blur:
+						// perform gaussian blur effect on the image
+						break;
+					case Adjust_Contrast:
+						// perform adjust contrast effect on the image
+						break;
+					case Unsharp_Mask:
+						// perform unsharp mask effect on the image
+						break;
+					case Super_Resolution:
+						// perform super resolution effect on the image
+						break;
+					case sRGB_to_Linear:
+						// perform sRGB to linear effect on the image
+						break;
+					case Linear_to_sRGB:
+						// perform linear to sRGB effect on the image
+						break;
+					case Edge_Pad:
+						// perform edge pad effect on the image
+						break;
+					case Resize:
+						// perform resize effect on the image
+						break;
+					case Swizzle:
+						// perform swizzle effect on the image
+						break;
+					default:
+						// handle errors ig
+						break;
+				}
+			}
+		};
+
+		class CompressionNode : public Node {
+			enum CompressionType {
+				BC7,
+				BC6S, 
+				ASTC,
+				BC3,
+				EIGHT,
+				USTC,
+				BC1
+				//etc? har begränsat kunskap om vad som är rimligt här
+			};
+			CompressionType compressionType;
+
+			void process() {
+				switch (compressionType) {
+					case BC7:
+						break;
+					case BC6S:
+						break;
+					case ASTC:
+						break;
+					case BC3:
+						break;
+					case EIGHT:
+						break;
+					case USTC:
+						break;
+					case BC1:
+						break;
+					default:
+						break;
+				}
+			}
 		};
 
 		NodeImGui::NodeId getUniqueId() {
@@ -181,16 +354,15 @@ class Application {
 
 		void cleanup() const { NodeImGui::DestroyEditor(nodeContext); }
 
-		void render() {
+		void render(Application* a) {
 			NodeImGui::SetCurrentEditor(nodeContext);
 			NodeImGui::Begin("Node Editor");
 
-			for (const auto& node : nodes) {
+			for (auto& node : nodes) {
 				NodeImGui::BeginNode(node.id);
 
 				ImGui::Text("Node - ID: %lu", node.id.Get());
 
-				// IF YOU TRY TO ADD THE PINS, THE PROGRAM FREEZES
 				for (const auto& inputPin : node.inputs) {
 					NodeImGui::BeginPin(inputPin, NodeImGui::PinKind::Input);
 					ImGui::Text("-> In");
@@ -198,8 +370,52 @@ class Application {
 				}
 				for (const auto& outputPin : node.outputs) {
 					NodeImGui::BeginPin(outputPin, NodeImGui::PinKind::Output);
-					ImGui::Text("<- Out");
+					ImGui::Text("Out ->");
 					NodeImGui::EndPin();
+				}
+
+				// problem med att node-imagen bara uppdaterar om man trycker på load-image igen efter man loadat
+				if (node.isInputNode) {
+					//pop and push unique IDs
+					if (ImGui::Button("Import Image")) {
+						SDL_ShowOpenFileDialog(
+							callback, a->renderer, a->window, dialog_filters.data(),
+							SDL_arraysize(dialog_filters), nullptr, true);
+					}
+					if (!original_textures.empty()) {
+						if (ImGui::Button("Load")) { // Right now you HAVE to load the image you imported, otherwise it won't be saved in the node. This could be worked around if you do node-saving in the callback, but I didn't feel like doing that.
+							node.setTexture(original_textures.back());
+							original_textures
+								.pop_back();
+						}
+					}
+					if (node.texture != NULL) {
+						float width, height;
+						SDL_GetTextureSize(node.texture, &width, &height);
+						float scaleFactor =
+							ImGui::GetContentRegionAvail().x / width;
+						ImVec2 scaledSize(
+							width * scaleFactor,
+							height * scaleFactor);	// Scale down the image
+						ImGui::Image(node.texture, scaledSize);
+					}
+				}
+
+				if (node.isOutputNode) {
+					if (ImGui::Button("Process chain")) {
+						//node.process(); ?
+					}
+					if (node.texture!=nullptr) {
+						float width, height;
+						SDL_GetTextureSize(node.texture, &width,
+										   &height);
+						float scaleFactor =
+							ImGui::GetContentRegionAvail().x / width;
+						ImVec2 scaledSize(
+							width * scaleFactor,
+							height * scaleFactor);	// Scale down the image
+						ImGui::Image(node.texture, scaledSize);
+					}
 				}
 
 				for (const auto& link : links) {
@@ -214,6 +430,7 @@ class Application {
 				NodeImGui::PinId inputPin, outputPin;
 				bool inputIsInput = false;
 				bool outputIsOutput = false;
+				bool numberOfLinksIsLessThanZero = true;
 				if (NodeImGui::QueryNewLink(&inputPin, &outputPin)) {
 					if (inputPin && outputPin && NodeImGui::AcceptNewItem()) {
 						Link link;
@@ -261,13 +478,10 @@ class Application {
 			NodeImGui::End();
 		}
 
-		void createLink(const NodeImGui::PinId startPin,
-						const NodeImGui::PinId endPin) {
-			Link newLink;
-			newLink.id = NodeImGui::LinkId(uniqueId++);
-			newLink.startPin = startPin;
-			newLink.endPin = endPin;
-			addLink(newLink);
+		void parseLinksToFindPathBetweenInputAndOutput(NodeImGui::NodeId inputNodeId, NodeImGui::NodeId outputNodeId) {
+			// Implement a graph traversal algorithm (like BFS or DFS) to find a path
+			// between the input node and the output node using the links.
+			// This is a placeholder for the actual implementation.
 		}
 
 		void reset() {
@@ -357,10 +571,20 @@ class Application {
 	}
 
 	void CreateInputNode() {
-		NodeEditor::Node node;
+		NodeEditor::InputNode node;
 		node.id = nodeEditor.getUniqueId();
 		NodeImGui::PinId outputPinId = nodeEditor.getUniquePinId();
 		node.outputs.push_back(outputPinId);
+		node.isInputNode = true;
+		nodeEditor.addNode(node);
+	}
+
+	void CreateOutputNode() {
+		NodeEditor::OutputNode node;
+		node.id = nodeEditor.getUniqueId();
+		NodeImGui::PinId inputPinId = nodeEditor.getUniquePinId();
+		node.inputs.push_back(inputPinId);
+		node.isOutputNode = true;
 		nodeEditor.addNode(node);
 	}
 
@@ -446,7 +670,7 @@ class Application {
 				"parallel.");
 			ImGui::Dummy(ImVec2(0.0f, 10.0f));
 			if (ImGui::Button("Create Output Node")) {
-				CreateNode();
+				CreateOutputNode();
 			}
 			ImGui::SameLine();
 			HelpMarker(
@@ -621,33 +845,10 @@ class Application {
 		ImGui::Dummy(ImVec2(
 			0.0f,
 			10.0f));  // cute spacing between drop-downs and file loading button
-		// THE OG IMAGE MANIPULATOR WINDOW vvv
-
-		// Testing-window that brings up file explorer
-		if (ImGui::Button("File explore tester (also display image)")) {
-			printf("Button A clicked!\n");
-			SDL_ShowOpenFileDialog(
-				callback, renderer, window, dialog_filters.data(),
-				SDL_arraysize(dialog_filters), nullptr, true);
-		}
 
 		ImGui::Dummy(ImVec2(0.0f, 10.0f));
 		if (ImGui::Button("Add node for testing")) {
 			CreateNode();
-		}
-
-		// Show the original images
-		if (!original_textures.empty()) {
-			// Get the last image in the vector and display it
-			float width, height;  // Width and height are set below
-			SDL_GetTextureSize(original_textures.back(), &width, &height);
-			float scaleFactor = ImGui::GetContentRegionAvail().x / width;
-			ImVec2 scaledSize(width * scaleFactor,
-							  height * scaleFactor);  // Scale down the image
-			ImGui::Image(original_textures.back(), scaledSize);
-			if (ImGui::Button("Process images (this does not work)")) {
-				processImages(renderer);  // Click to manipulate images
-			}
 		}
 
 		ImGui::End();
@@ -712,7 +913,7 @@ class Application {
 							ImGui::GetIO().MousePos.x,
 							ImGui::GetIO().MousePos.y);
 			}
-			nodeEditor.render();  // Render the node editor
+			nodeEditor.render(this);  // Render the node editor
 			ImGui::End();
 		}
 	}
