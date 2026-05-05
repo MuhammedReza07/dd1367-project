@@ -113,7 +113,7 @@ static void processImages(SDL_Renderer* renderer) {
 
 // Because RAII is pretty nice <3
 class Application {
-    private:
+   private:
 	ApplicationStatus status;
 	float scale;
 	std::string window_title;
@@ -136,8 +136,8 @@ class Application {
 			ImVector<NodeImGui::PinId> inputs;
 			ImVector<NodeImGui::PinId> outputs;
 
-			// ok på något sätt måste nodes lagra data om typ bilder/textures som finns i inputnoder, och vilka effekter olika effektnoder har
-
+			// ok på något sätt måste nodes lagra data om typ bilder/textures
+			// som finns i inputnoder, och vilka effekter olika effektnoder har
 		};
 
 		NodeImGui::NodeId getUniqueId() {
@@ -157,30 +157,30 @@ class Application {
 		std::vector<Node> nodes;
 		std::vector<Link> links;
 
-		void addNode(Node node) { nodes.push_back(node); }
+		void addNode(const Node& node) { nodes.push_back(node); }
 
-		void addLink(Link link) { links.push_back(link); }
+		void addLink(const Link& link) { links.push_back(link); }
 
-		void removeNode(NodeImGui::NodeId nodeId) {
-			for (int i = 0; i < nodes.size(); ++i) {
-				if (nodes[i].id == nodeId) {
-					nodes.erase(nodes.begin() + i);
-					break;
-				}
+		void removeNode(NodeImGui::NodeId nodeToDelete) {
+			const auto id = std::find_if(
+				nodes.begin(), nodes.end(),
+				[nodeToDelete](auto& node) { return node.id == nodeToDelete; });
+			if (id != nodes.end()) {
+				nodes.erase(id);
 			}
 		}
 
-		void removeLink(NodeImGui::LinkId linkId) {
-			for (int i = 0; i < links.size(); ++i) {
-				if (links[i].id == linkId) {
-					links.erase(links.begin() + i);
-					break;
-				}
+		void removeLink(NodeImGui::LinkId linkToDelete) {
+			const auto id = std::find_if(
+				links.begin(), links.end(),
+				[linkToDelete](auto& link) { return link.id == linkToDelete; });
+			if (id != links.end()) {
+				links.erase(id);
 			}
 		}
 
-		void cleanup() { NodeImGui::DestroyEditor(nodeContext); }
-	
+		void cleanup() const { NodeImGui::DestroyEditor(nodeContext); }
+
 		void render() {
 			NodeImGui::SetCurrentEditor(nodeContext);
 			NodeImGui::Begin("Node Editor");
@@ -188,8 +188,8 @@ class Application {
 			for (const auto& node : nodes) {
 				NodeImGui::BeginNode(node.id);
 
-				ImGui::Text("Node - ID: %d", node.id.Get());
-				
+				ImGui::Text("Node - ID: %lu", node.id.Get());
+
 				// IF YOU TRY TO ADD THE PINS, THE PROGRAM FREEZES
 				for (const auto& inputPin : node.inputs) {
 					NodeImGui::BeginPin(inputPin, NodeImGui::PinKind::Input);
@@ -237,18 +237,20 @@ class Application {
 						removeLink(linkId);
 					}
 				}
-				NodeImGui::NodeId nodeId;
+				NodeImGui::NodeId nodeId = 0;
 				while (NodeImGui::QueryDeletedNode(&nodeId)) {
 					if (NodeImGui::AcceptDeletedItem()) {
 						removeNode(nodeId);
 					}
 				}
+				NodeImGui::EndDelete();
 			}
 
 			NodeImGui::End();
 		}
 
-		void createLink(NodeImGui::PinId startPin, NodeImGui::PinId endPin) {
+		void createLink(const NodeImGui::PinId startPin,
+						const NodeImGui::PinId endPin) {
 			Link newLink;
 			newLink.id = NodeImGui::LinkId(uniqueId++);
 			newLink.startPin = startPin;
@@ -261,20 +263,18 @@ class Application {
 			links.clear();
 			uniqueId = 1;
 		}
-		
 	};
 
 	NodeEditor nodeEditor;
 
-
-    public:
+   public:
 	/**
 	Initialize the application with the provided window dimensions and title.
 
 	@return An `Application` object. Make sure to call `get_status()` on the
 	returned object before using it to find out if initialization has failed!
 	*/
-	Application(const std::string& window_title)
+	explicit Application(const std::string& window_title)
 		: status{SUCCESS}, scale{}, window_title(window_title) {
 		// Initialize SDL.
 		if (SDL_Init(SDL_INIT_VIDEO) == false) {
@@ -294,9 +294,10 @@ class Application {
 			SDL_WINDOW_RESIZABLE;  // The window must be shown explicitly.
 		window = SDL_CreateWindow(
 			window_title.c_str(),
-			static_cast<int>(static_cast<float>(1780) * scale), //i think this should automatically adapt to user screen size
-			static_cast<int>(static_cast<float>(900) * scale),
-			flags);
+			static_cast<int>(static_cast<float>(1780) *
+							 scale),  // I think this should automatically adapt
+									  // to user screen size
+			static_cast<int>(static_cast<float>(900) * scale), flags);
 		if (window == nullptr) {
 			SDL_Log("SDL_CreateWindow: %s", SDL_GetError());
 			status = INITIALIZATION_ERROR;
@@ -321,26 +322,26 @@ class Application {
 
 	@return the status of the application as an `ApplicationStatus` value.
 	*/
-	ApplicationStatus get_status() { return status; }
+	[[nodiscard]] ApplicationStatus get_status() const { return status; }
 
-	private:
+   private:
 	// Function to create a node with 2 input pins and 2 outputs, has no
 	// specific type, just a generic node for testing
 	void CreateNode() {
-		 NodeEditor::Node node;
-		 node.id = nodeEditor.getUniqueId();
-		 
-		 for (int i = 0; i < 2; ++i) {
+		NodeEditor::Node node;
+		node.id = nodeEditor.getUniqueId();
+
+		for (int i = 0; i < 2; ++i) {
 			NodeImGui::PinId inputPinId = nodeEditor.getUniquePinId();
 			node.inputs.push_back(inputPinId);
-		 }
+		}
 
-		 for (int i = 0; i < 2; ++i) {
+		for (int i = 0; i < 2; ++i) {
 			NodeImGui::PinId outputPinId = nodeEditor.getUniquePinId();
 			node.outputs.push_back(outputPinId);
-		 }
+		}
 
-		 nodeEditor.addNode(node);
+		nodeEditor.addNode(node);
 	}
 
 	void CreateInputNode() {
@@ -361,31 +362,34 @@ class Application {
 		}
 	}
 
-	// menu for handling the nodestuff. You should be able to select different node types, also handle settings of individual nodes
+	// menu for handling the node-stuff. You should be able to select different
+	// node types, also handle settings of individual nodes
 	void LeftSideMenu() {
-		ImGuiViewport* viewport = ImGui::GetMainViewport();
-		float menuBarHeight = ImGui::GetFrameHeight();
-		ImGui::SetNextWindowPos(ImVec2(viewport->Pos.x, viewport->Pos.y + menuBarHeight));
-		ImGui::SetNextWindowSize(ImVec2(viewport->Size.x/4, viewport->Size.y - menuBarHeight));
+		const ImGuiViewport* viewport = ImGui::GetMainViewport();
+		const float menuBarHeight = ImGui::GetFrameHeight();
+		ImGui::SetNextWindowPos(
+			ImVec2(viewport->Pos.x, viewport->Pos.y + menuBarHeight));
+		ImGui::SetNextWindowSize(
+			ImVec2(viewport->Size.x / 4, viewport->Size.y - menuBarHeight));
 		ImGui::SetNextWindowViewport(viewport->ID);
 		ImGui::Begin("Window A", nullptr,
 					 ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove |
 						 ImGuiWindowFlags_NoResize |
-							 ImGuiWindowFlags_NoBringToFrontOnFocus);
-		
-		
+						 ImGuiWindowFlags_NoBringToFrontOnFocus);
+
 		// RESET BUTTON STARTS HERE
 		if (ImGui::Button("Reset")) ImGui::OpenPopup("Reset?");
 
 		// Always center this window when appearing
-		ImVec2 center = ImGui::GetMainViewport()->GetCenter();
+		const ImVec2 center = ImGui::GetMainViewport()->GetCenter();
 		ImGui::SetNextWindowPos(center, ImGuiCond_Appearing,
 								ImVec2(0.5f, 0.5f));
 
-		if (ImGui::BeginPopupModal("Reset?", NULL,
+		if (ImGui::BeginPopupModal("Reset?", nullptr,
 								   ImGuiWindowFlags_AlwaysAutoResize)) {
 			ImGui::Text(
-				"The node graph and all related settings will be reset.\nThis operation "
+				"The node graph and all related settings will be reset.\nThis "
+				"operation "
 				"cannot be undone.");
 			ImGui::Separator();
 			static bool dont_ask_me_next_time = false;
@@ -406,7 +410,6 @@ class Application {
 		}
 		// RESET BUTTON ENDS HERE
 
-
 		// OTHER BUTTONS (THEY DO NOT WORK)
 		ImGui::SameLine();
 		bool butt_2 = ImGui::Button("Load Preset");
@@ -418,12 +421,12 @@ class Application {
 		}
 
 		ImGui::Dummy(ImVec2(0.0f, 10.0f));
-		// COLAPSING HEADERS START HERE
+		// COLLAPSING HEADERS START HERE
 		if (ImGui::CollapsingHeader("IO")) {
 			ImGui::Dummy(ImVec2(0.0f, 10.0f));
-			if (ImGui::Button("Create Input Node")){
+			if (ImGui::Button("Create Input Node")) {
 				CreateInputNode();
-			} 
+			}
 			ImGui::SameLine();
 			HelpMarker(
 				"This node will be used to load images into the graph. You can "
@@ -446,92 +449,96 @@ class Application {
 		if (ImGui::CollapsingHeader("Mipmap")) {
 			ImGui::Dummy(ImVec2(0.0f, 10.0f));
 			if (ImGui::Button("Create MipMap Node")) {
-			} 
+			}
 			ImGui::SameLine();
 			HelpMarker(
-				"This node will be used to generate mipmaps for the input images. "
-				"You can choose the number of mipmap levels to generate, and the "
+				"This node will be used to generate mipmaps for the input "
+				"images. "
+				"You can choose the number of mipmap levels to generate, and "
+				"the "
 				"filtering method to use.");
 			ImGui::SeparatorText("Options");
-
 		}
 		if (ImGui::CollapsingHeader("Effects")) {
 			ImGui::Dummy(ImVec2(0.0f, 10.0f));
-			ImGui::BeginChild( "ChildR", ImVec2(0, 160));
-				if (ImGui::BeginTable("Effects' table", 1)) {
-					ImGui::TableNextColumn();
+			ImGui::BeginChild("ChildR", ImVec2(0, 160));
+			if (ImGui::BeginTable("Effects' table", 1)) {
+				ImGui::TableNextColumn();
 
-					if (ImGui::Button("2D Convolution")) {} 
-
-					if (ImGui::Button("Negative")) {}
-
-					if (ImGui::Button("Lighter")) {}
-
-					if (ImGui::Button("Darker")) {
-					}
-
-					if (ImGui::Button("Contrast More")) {
-					}
-					
-					if (ImGui::Button("Contrast Less")) {
-					}
-					
-					if (ImGui::Button("Smooth")) {
-					}
-					
-					if (ImGui::Button("Sharpen Soft")) {
-					}
-					
-					if (ImGui::Button("Sharpen Medium")) {
-					}
-					
-					if (ImGui::Button("Sharpen Strong")) {
-					}
-					
-					if (ImGui::Button("Find Edges")) {
-					}
-					
-					if (ImGui::Button("Contour")) {
-					}
-					
-					if (ImGui::Button("Edge Detect")) {
-					}
-					
-					if (ImGui::Button("Edge Detect Soft")) {
-					}
-					
-					if (ImGui::Button("Emboss")) {
-					}
-					
-					if (ImGui::Button("Gaussian Blur")) {
-					}
-					
-					if (ImGui::Button("Adjust Contrast")) {
-					}
-					
-					if (ImGui::Button("Unsharp Mask")) {
-					}
-					
-					if (ImGui::Button("Super-Resolution")) {
-					}
-					
-					if (ImGui::Button("sRGB to Linear")) {
-					}
-					
-					if (ImGui::Button("Linear to sRGB")) {
-					}
-					
-					if (ImGui::Button("Edge Pad (Solidify)")) {
-					}
-					
-					if (ImGui::Button("Resize")) {
-					}
-					
-					if (ImGui::Button("Swizzle")) {
-					}
-					
-					ImGui::EndTable();
+				if (ImGui::Button("2D Convolution")) {
 				}
+
+				if (ImGui::Button("Negative")) {
+				}
+
+				if (ImGui::Button("Lighter")) {
+				}
+
+				if (ImGui::Button("Darker")) {
+				}
+
+				if (ImGui::Button("Contrast More")) {
+				}
+
+				if (ImGui::Button("Contrast Less")) {
+				}
+
+				if (ImGui::Button("Smooth")) {
+				}
+
+				if (ImGui::Button("Sharpen Soft")) {
+				}
+
+				if (ImGui::Button("Sharpen Medium")) {
+				}
+
+				if (ImGui::Button("Sharpen Strong")) {
+				}
+
+				if (ImGui::Button("Find Edges")) {
+				}
+
+				if (ImGui::Button("Contour")) {
+				}
+
+				if (ImGui::Button("Edge Detect")) {
+				}
+
+				if (ImGui::Button("Edge Detect Soft")) {
+				}
+
+				if (ImGui::Button("Emboss")) {
+				}
+
+				if (ImGui::Button("Gaussian Blur")) {
+				}
+
+				if (ImGui::Button("Adjust Contrast")) {
+				}
+
+				if (ImGui::Button("Unsharp Mask")) {
+				}
+
+				if (ImGui::Button("Super-Resolution")) {
+				}
+
+				if (ImGui::Button("sRGB to Linear")) {
+				}
+
+				if (ImGui::Button("Linear to sRGB")) {
+				}
+
+				if (ImGui::Button("Edge Pad (Solidify)")) {
+				}
+
+				if (ImGui::Button("Resize")) {
+				}
+
+				if (ImGui::Button("Swizzle")) {
+				}
+
+				ImGui::EndTable();
+			}
 			ImGui::EndChild();
 			ImGui::Dummy(ImVec2(0.0f, 10.0f));
 		}
@@ -567,7 +574,7 @@ class Application {
 				ImGui::Dummy(ImVec2(0.0f, 10.0f));
 			}
 		}
-		if (ImGui::CollapsingHeader("Image Options")){
+		if (ImGui::CollapsingHeader("Image Options")) {
 			ImGui::Dummy(ImVec2(0.0f, 10.0f));
 			if (ImGui::Button("Color Map")) {
 			}
@@ -599,9 +606,11 @@ class Application {
 		ImGui::Dummy(ImVec2(0.0f, 10.0f));
 		ImGui::SeparatorText("Testing stuff below");
 
-		ImGui::Dummy(ImVec2(0.0f, 10.0f)); // cute spacing between drop downs and file loading button
-		// THE OG IMAGE MANPIPULATOR WINDOW vvv 
-		
+		ImGui::Dummy(ImVec2(
+			0.0f,
+			10.0f));  // cute spacing between drop-downs and file loading button
+		// THE OG IMAGE MANIPULATOR WINDOW vvv
+
 		// Testing-window that brings up file explorer
 		if (ImGui::Button("File explore tester (also display image)")) {
 			printf("Button A clicked!\n");
@@ -620,20 +629,20 @@ class Application {
 			// Get the last image in the vector and display it
 			float width, height;  // Width and height are set below
 			SDL_GetTextureSize(original_textures.back(), &width, &height);
-			float scaleFactor =  ImGui::GetContentRegionAvail().x / width;
+			float scaleFactor = ImGui::GetContentRegionAvail().x / width;
 			ImVec2 scaledSize(width * scaleFactor,
-								height * scaleFactor);  // Scale down the image
+							  height * scaleFactor);  // Scale down the image
 			ImGui::Image(original_textures.back(), scaledSize);
 			if (ImGui::Button("Process images (this does not work)")) {
 				processImages(renderer);  // Click to manipulate images
 			}
 		}
 
-		
 		ImGui::End();
 	}
 
-	// menu for handling "projects"? like saving graphs, and idk. it's the top main menu bar, like the one you usually see in apps
+	// menu for handling "projects"? like saving graphs, and IDK. it's the top
+	// main menu bar, like the one you usually see in apps
 	static void ShowMainMenuBar() {
 		if (ImGui::BeginMainMenuBar()) {
 			if (ImGui::BeginMenu("File")) {
@@ -657,8 +666,8 @@ class Application {
 			}
 
 			if (ImGui::BeginMenu("Help")) {
-				ImGui::MenuItem("Github: "); 
-				//fixa länk typ?
+				ImGui::MenuItem("Github: ");
+				// fixa länk typ?
 				ImGui::EndMenu();
 			}
 			ImGui::EndMainMenuBar();
@@ -666,19 +675,25 @@ class Application {
 	}
 
 	void ShowNodeEditor() {
-
 		// Node editor
-		ImGuiViewport* viewport = ImGui::GetMainViewport();
-		float menuBarHeight = ImGui::GetFrameHeight();
-		ImGui::SetNextWindowPos(ImVec2(viewport->Size.x - viewport->Size.x * 3 / 4, viewport->Pos.y + menuBarHeight));
-		ImGui::SetNextWindowSize(ImVec2(viewport->Size.x * 3 / 4, viewport->Size.y - menuBarHeight));
+		const ImGuiViewport* viewport = ImGui::GetMainViewport();
+		const float menuBarHeight = ImGui::GetFrameHeight();
+		ImGui::SetNextWindowPos(
+			ImVec2(viewport->Size.x - viewport->Size.x * 3 / 4,
+				   viewport->Pos.y + menuBarHeight));
+		ImGui::SetNextWindowSize(
+			ImVec2(viewport->Size.x * 3 / 4, viewport->Size.y - menuBarHeight));
 		ImGui::SetNextWindowViewport(viewport->ID);
-		if (ImGui::Begin("Node Editor", nullptr,ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoMove)) {
+		if (ImGui::Begin("Node Editor", nullptr,
+						 ImGuiWindowFlags_NoTitleBar |
+							 ImGuiWindowFlags_NoResize |
+							 ImGuiWindowFlags_NoBringToFrontOnFocus |
+							 ImGuiWindowFlags_NoMove)) {
 			HelpMarker(
 				"Tip: \n Press DELETE KEY to remove nodes \n Press F to "
 				"center on graph");
 			ImGui::SameLine();
-			ImGui::Text("          Node count: %d", nodeEditor.nodes.size());
+			ImGui::Text("          Node count: %lu", nodeEditor.nodes.size());
 			if (ImGui::IsMousePosValid()) {
 				ImGui::SameLine();
 				ImGui::Text("             Mouse pos: (%g, %g)",
@@ -689,10 +704,10 @@ class Application {
 			ImGui::End();
 		}
 	}
-	
-	public:
+
+   public:
 	// This function is just for testing and experimenting with ImGui and the
-	// node editor. Testing different designs 
+	// node editor. Testing different designs
 	void run() {
 		// Show window.
 		if (SDL_ShowWindow(window) == false) {
@@ -748,9 +763,9 @@ class Application {
 			ImGui_ImplSDLRenderer3_NewFrame();
 			ImGui_ImplSDL3_NewFrame();
 			ImGui::NewFrame();
-			
+
 			// ------ individual window features code here
-		
+
 			ShowNodeEditor();
 			ShowMainMenuBar();
 			LeftSideMenu();
@@ -762,11 +777,12 @@ class Application {
 
 			// Render the ImGui frame.
 			ImGui::Render();
-			SDL_SetRenderScale(renderer, io.DisplayFramebufferScale.x,io.DisplayFramebufferScale.y);
+			SDL_SetRenderScale(renderer, io.DisplayFramebufferScale.x,
+							   io.DisplayFramebufferScale.y);
 			SDL_SetRenderDrawColorFloat(renderer, 0, 0, 0, 0);
 			SDL_RenderClear(renderer);
 			ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(),
-													renderer);
+												  renderer);
 			SDL_RenderPresent(renderer);
 		}
 	}
@@ -800,8 +816,8 @@ class Application {
 };
 
 int main() {
-	Application application = Application(
-		"DD1367 Compression & Texturepacking Node Editor :3");
+	auto application =	// Replace text once we have a real product name
+		Application("DD1367 Compression & Texture-packing Node Editor");
 
 	// Check for initialization errors before running.
 	if (application.get_status() != SUCCESS) {
