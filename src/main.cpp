@@ -212,18 +212,30 @@ class Application {
 			// Create new links between pins
 			if (NodeImGui::BeginCreate()) {
 				NodeImGui::PinId inputPin, outputPin;
+				bool inputIsInput = false;
+				bool outputIsOutput = false;
 				if (NodeImGui::QueryNewLink(&inputPin, &outputPin)) {
 					if (inputPin && outputPin && NodeImGui::AcceptNewItem()) {
 						Link link;
 						link.id = uniqueId++;
 						link.startPin = inputPin;
 						link.endPin = outputPin;
-						printf("Link Created: %d -> %d with ID %d \n",
-							   static_cast<int>(link.startPin.Get()),
-							   static_cast<int>(link.endPin.Get()),
-							   static_cast<int>(link.id.Get()));
-						links.push_back(link);
-						// NodeImGui::Link(testLink2, outputPin, inputPin);
+						//make sure output pin actually goes into an input pin or vice versa (forbid input->input and output->output)
+						for (const auto& node : nodes) {
+							if (node.inputs.contains(inputPin)) {
+								inputIsInput = true;
+							}
+							if (node.outputs.contains(outputPin)) {
+								outputIsOutput = true;
+							}
+						}
+						if (inputIsInput && outputIsOutput || !(inputIsInput || outputIsOutput)) {
+							printf("Link Created: %d -> %d with ID %d \n",
+								   static_cast<int>(link.startPin.Get()),
+								   static_cast<int>(link.endPin.Get()),
+								   static_cast<int>(link.id.Get()));
+							links.push_back(link);
+						}
 					}
 				}
 				NodeImGui::EndCreate();
