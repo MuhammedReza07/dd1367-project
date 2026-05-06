@@ -428,6 +428,7 @@ class Application {
 			// Create new links between pins
 			if (NodeImGui::BeginCreate()) {
 				NodeImGui::PinId inputPin, outputPin;
+				NodeImGui::NodeId inputNode, outputNode;
 				bool inputIsInput = false;
 				bool outputIsOutput = false;
 				bool numberOfLinksIsLessThanZero = true;
@@ -437,16 +438,22 @@ class Application {
 						link.id = uniqueId++;
 						link.startPin = inputPin;
 						link.endPin = outputPin;
-						//make sure output pin actually goes into an input pin or vice versa (forbid input->input and output->output)
+						// make sure output pin actually goes into an input pin
+						// or vice versa (forbid input->input and
+						// output->output)
 						for (const auto& node : nodes) {
 							if (node.inputs.contains(inputPin)) {
 								inputIsInput = true;
+								inputNode = node.id;
 							}
 							if (node.outputs.contains(outputPin)) {
 								outputIsOutput = true;
+								outputNode = node.id;
 							}
 						}
-						if (inputIsInput && outputIsOutput || !(inputIsInput || outputIsOutput)) {
+						if (inputIsInput && outputIsOutput &&
+								inputNode != outputNode ||
+							!(inputIsInput || outputIsOutput)) {
 							printf("Link Created: %d -> %d with ID %d \n",
 								   static_cast<int>(link.startPin.Get()),
 								   static_cast<int>(link.endPin.Get()),
