@@ -332,8 +332,6 @@ class Application {
 
 		void addNode(const Node& node) { nodes.push_back(node); }
 
-		void addLink(const Link& link) { links.push_back(link); }
-
 		void removeNode(NodeImGui::NodeId nodeToDelete) {
 			const auto id = std::find_if(
 				nodes.begin(), nodes.end(),
@@ -438,7 +436,9 @@ class Application {
 			if (NodeImGui::BeginCreate()) {
 				NodeImGui::PinId source, destination;
 				NodeImGui::NodeId sourceNode, destinationNode;
-				if (NodeImGui::QueryNewLink(&source, &destination)) {
+				if (NodeImGui::QueryNewLink(
+						&source,
+						&destination)) {									// only allows one link to be created per two pins (not sure if we want this check)
 					if (source && destination && NodeImGui::AcceptNewItem() && !linkExists(source, destination)) {
 						bool sourceIsInput = false;
 						bool destinationIsOutput = false;
@@ -446,9 +446,6 @@ class Application {
 						bool destinationIsInput = false;
 						bool sameNode = false;
 						bool valid = false;
-						bool numberOfLinksIsLessThanZero =
-							true;  // tvinga eventuellt 1 link per pin? (ej
-								   // implementerat än)
 						Link link;
 						link.id = uniqueId++;
 						// make sure output pin actually goes into an input pin
@@ -463,7 +460,7 @@ class Application {
 								destinationIsOutput = true;
 								destinationNode = node.id;
 							}
-							if (node.outputs.contains(source)) {
+							if (node.outputs.contains(source)) { // getting warnings that this code is redundant? don't really understand why
 								sourceIsOutput = true;
 								sourceNode = node.id;
 							}
@@ -515,10 +512,9 @@ class Application {
 			NodeImGui::End();
 		}
 
-		void parseLinksToFindPathBetweenInputAndOutput(NodeImGui::NodeId inputNodeId, NodeImGui::NodeId outputNodeId) {
-			// Implement a graph traversal algorithm (like BFS or DFS) to find a path
-			// between the input node and the output node using the links.
-			// This is a placeholder for the actual implementation.
+		std::vector<Node> parseLinksToFindPathBetweenInputAndOutput(
+			NodeImGui::NodeId outputNodeId) {
+			
 		}
 
 		void reset() {
@@ -594,15 +590,12 @@ class Application {
 		NodeEditor::Node node;
 		node.id = nodeEditor.getUniqueId();
 
-		for (int i = 0; i < 2; ++i) {
 			NodeImGui::PinId inputPinId = nodeEditor.getUniquePinId();
 			node.inputs.push_back(inputPinId);
-		}
 
-		for (int i = 0; i < 2; ++i) {
 			NodeImGui::PinId outputPinId = nodeEditor.getUniquePinId();
 			node.outputs.push_back(outputPinId);
-		}
+
 
 		nodeEditor.addNode(node);
 	}
