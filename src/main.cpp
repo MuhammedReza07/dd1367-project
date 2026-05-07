@@ -15,6 +15,8 @@
 #include <array>
 #include <string>
 #include <vector>
+#include <memory>
+#include <algorithm>
 
 namespace NodeImGui = ax::NodeEditor;
 
@@ -133,185 +135,248 @@ class Application {
 		};
 
 		class Node {
-		    public:
+		  public:
 			NodeImGui::NodeId id;
 			ImVector<NodeImGui::PinId> inputs;
 			ImVector<NodeImGui::PinId> outputs;
-			SDL_Texture* texture =
-				{};	 // the image that is being processed by this node (should
-					 // update between nodes?)
-			bool isInputNode = false;
-			bool isOutputNode = false;
+
+			SDL_Texture* texture = nullptr;
+			std::string sourceFile;
+			std::string outputFile;
+
+			virtual ~Node() = default;
+
+			virtual const char* name() const { return "Node"; }
+
+			virtual void renderBody(Application* app, NodeEditor& editor) {
+				// Default node has no custom UI.
+			}
+
+			virtual bool process(NodeEditor& editor, SDL_Renderer* renderer) {
+				return true;
+			}
 
 			void setTexture(SDL_Texture* newTexture) { texture = newTexture; }
-
-			virtual void process() {
-				// implement specific processing logic for different nodes
-			}
 		};
 
 		class InputNode : public Node {
-			void process() {
+			bool containsImage = false;
+		   public:
+			const char* name() const override { return "Input Node"; }
+			InputNode() { this->containsImage = false; }
+
+			void renderBody(Application* app, NodeEditor& editor) override {
+				if (ImGui::Button("Import Image")) {
+					SDL_ShowOpenFileDialog(callback, app->renderer, app->window,
+										   dialog_filters.data(),
+										   SDL_arraysize(dialog_filters),
+										   nullptr, true);
+					this->containsImage = true;
+				}
+
+				if (!original_textures.empty() && !selected_files.empty() &&
+					containsImage) {
+					if (ImGui::Button("Load")) {
+						texture = original_textures.back();
+						sourceFile = selected_files.back();
+
+						original_textures.pop_back();
+						selected_files.pop_back();
+						this->containsImage = false;
+					}
+				}
+
+				if (texture != nullptr) {
+					float width, height;
+					SDL_GetTextureSize(texture, &width, &height);
+					
+					
+					float maxWidth =
+						1000.0f / width;  // Scale down if texture is wider than
+										  // 1000 pixels
+					float scaleFactor = std::min(maxWidth, 1.0f);
+					
+
+					ImVec2 scaledSize(width * scaleFactor,
+									  height * scaleFactor);
+
+					ImGui::Image(texture, scaledSize);
+				}
 			}
 		};
 
 		class OutputNode : public Node {
+		    bool containsImage = false;
+		   public:
+			OutputNode() { this->containsImage = false; }
+			const char* name() const override { return "Output Node"; }
 
-			void process() {}
+			void renderBody(Application* app, NodeEditor& editor) override {
+
+				//if (!containsImage) {
+					if (ImGui::Button("Process chain")) {
+						process(editor, app->renderer);
+						//this->containsImage = true;
+					}
+				//}
+
+				if (!outputFile.empty()) {
+					ImGui::Text("Output: %s", outputFile.c_str());
+				}
+
+				if (texture != nullptr) {
+					float width, height;
+					SDL_GetTextureSize(texture, &width, &height);
+
+					float maxWidth =
+						1000.0f / width;  // Scale down if texture is wider than
+										  // 1000 pixels
+					float scaleFactor = std::min(maxWidth, 1.0f);
+
+					ImVec2 scaledSize(width * scaleFactor,
+									  height * scaleFactor);
+
+					ImGui::Image(texture, scaledSize);
+				}
+			}
+
+			bool process(NodeEditor& editor, SDL_Renderer* renderer) override {
+				Node* upstreamNode = editor.findUpstreamNode(*this);
+
+				if (upstreamNode == nullptr) {
+					SDL_Log("Output node has no upstream node.");
+					return false;
+				}
+
+				if (!upstreamNode->process(editor, renderer)) {
+					SDL_Log("Upstream node failed processing.");
+					return false;
+				}
+
+				texture = upstreamNode->texture;
+				outputFile = upstreamNode->outputFile;
+
+				SDL_Log("Output node received file: %s", outputFile.c_str());
+				return true;
+			}
 		};
 
 		class MipMapNode : public Node {
-			int mipmapLevels;
-			void process() {
-			
+		   public:
+			int mipmapLevels = 1;
+
+			const char* name() const override { return "MipMap Node"; }
+
+			bool process(NodeEditor& editor, SDL_Renderer* renderer) override {
+				return true;
 			}
 		};
 
 		class EffectNode : public Node {
-			enum EffectType {
-				TWOD_Convolution, 
-				Negative,
-				Lighter,
-				Darker,
-				Contrast_More,
-				Contrast_Less,
-				Smooth,
-				Sharpen_Soft,
-				Sharpen_Medium,
-				Sharpen_Strong,
-				Find_Edges,
-				Contour,
-				Edge_Detect,
-				Edge_Detect_Soft,
-				Emboss,
-				Gaussian_Blur,
-				Adjust_Contrast,
-				Unsharp_Mask,
-				Super_Resolution,
-				sRGB_to_Linear,
-				Linear_to_sRGB,
-				Edge_Pad,
-				Resize,
-				Swizzle
-			};
-			EffectType effectType;
+		   public:
+			const char* name() const override { return "Effect Node"; }
 
-			// now depending on what effecttype a specific node object has, perform different operations on the image
-			void process() {
-				switch (effectType) {
-					case TWOD_Convolution:
-						// perform 2D convolution on the image
-						break;
-					case Negative:
-						// perform negative effect on the image
-						break;
-					case Lighter:
-						// perform lighter effect on the image
-						break;
-					case Darker:
-						// perform darker effect on the image
-						break;
-					case Contrast_More:
-						// perform contrast more effect on the image
-						break;
-					case Contrast_Less:
-						// perform contrast less effect on the image
-						break;
-					case Smooth:
-						// perform smooth effect on the image
-						break;
-					case Sharpen_Soft:
-						// perform sharpen soft effect on the image
-						break;
-					case Sharpen_Medium:
-						// perform sharpen medium effect on the image
-						break;
-					case Sharpen_Strong:
-						// perform sharpen strong effect on the image
-						break;
-					case Find_Edges:
-						// perform find edges effect on the image
-						break;
-					case Contour:
-						// perform contour effect on the image
-						break;
-					case Edge_Detect:
-						// perform edge detect effect on the image
-						break;
-					case Edge_Detect_Soft:
-						// perform edge detect soft effect on the image
-						break;
-					case Emboss:
-						// perform emboss effect on the image
-						break;
-					case Gaussian_Blur:
-						// perform gaussian blur effect on the image
-						break;
-					case Adjust_Contrast:
-						// perform adjust contrast effect on the image
-						break;
-					case Unsharp_Mask:
-						// perform unsharp mask effect on the image
-						break;
-					case Super_Resolution:
-						// perform super resolution effect on the image
-						break;
-					case sRGB_to_Linear:
-						// perform sRGB to linear effect on the image
-						break;
-					case Linear_to_sRGB:
-						// perform linear to sRGB effect on the image
-						break;
-					case Edge_Pad:
-						// perform edge pad effect on the image
-						break;
-					case Resize:
-						// perform resize effect on the image
-						break;
-					case Swizzle:
-						// perform swizzle effect on the image
-						break;
-					default:
-						// handle errors ig
-						break;
+			void renderBody(Application* app, NodeEditor& editor) override {
+				ImGui::Text("Effect node placeholder");
+			}
+
+			bool process(NodeEditor& editor, SDL_Renderer* renderer) override {
+				Node* inputNode = editor.findUpstreamNode(*this);
+
+				if (inputNode == nullptr) {
+					SDL_Log("Effect node has no input.");
+					return false;
 				}
+
+				if (!inputNode->process(editor, renderer)) {
+					return false;
+				}
+
+				texture = inputNode->texture;
+				sourceFile = inputNode->sourceFile;
+				outputFile = inputNode->outputFile;
+
+				return true;
 			}
 		};
+
 
 		class CompressionNode : public Node {
-			enum CompressionType {
-				BC7,
-				BC6S, 
-				ASTC,
-				BC3,
-				EIGHT,
-				USTC,
-				BC1
-				//etc? har begränsat kunskap om vad som är rimligt här
-			};
-			CompressionType compressionType;
+		   public:
+			enum class CompressionType { BC7, BC3, BC2, BC1 };
 
-			void process() {
+			CompressionType compressionType = CompressionType::BC7;
+
+			const char* name() const override { return "Compression Node"; }
+
+			void renderBody(Application* app, NodeEditor& editor) override {
+			switch (compressionType) {
+				case CompressionType::BC7:
+					ImGui::Text("Compression: BC7");
+					break;
+				case CompressionType::BC3:
+					ImGui::Text("Compression: BC3");
+					break;
+				case CompressionType::BC2:
+					ImGui::Text("Compression: BC2");
+					break;
+				case CompressionType::BC1:
+					ImGui::Text("Compression: BC1");
+					break;
+			}
+
+			}
+
+			bool process(NodeEditor& editor, SDL_Renderer* renderer) override {
+				Node* inputNode = editor.findUpstreamNode(*this);
+
+				if (inputNode == nullptr) {
+					SDL_Log("Compression node has no input.");
+					return false;
+				}
+
+				if (inputNode->sourceFile.empty()) {
+					SDL_Log("Input node has no source file.");
+					return false;
+				}
+
 				switch (compressionType) {
-					case BC7:
+					case CompressionType::BC7:
+						outputFile = "output_bc7.dds";
+						if (!editor.compressBCToDDS(inputNode->sourceFile, outputFile, compressionType)) {
+							return false;
+						}
 						break;
-					case BC6S:
+					case CompressionType::BC3:
+						outputFile = "output_bc3.dds";
+						if (!editor.compressBCToDDS(inputNode->sourceFile,
+													 outputFile, compressionType)) {
+							return false;
+						}
 						break;
-					case ASTC:
+					case CompressionType::BC2:
+						outputFile = "output_bc2.dds";
+						if (!editor.compressBCToDDS(inputNode->sourceFile,
+													 outputFile, compressionType)) {
+							return false;
+						}
 						break;
-					case BC3:
-						break;
-					case EIGHT:
-						break;
-					case USTC:
-						break;
-					case BC1:
-						break;
-					default:
+					case CompressionType::BC1:
+						outputFile = "output_bc1.dds";
+						if (!editor.compressBCToDDS(inputNode->sourceFile,
+													 outputFile, compressionType)) {
+							return false;
+						}
 						break;
 				}
+
+				// Preview fallback: show original texture for now.
+				texture = inputNode->texture;
+
+				return true;
 			}
 		};
+
 
 		NodeImGui::NodeId getUniqueId() {
 			return NodeImGui::NodeId(uniqueId++);
@@ -327,17 +392,55 @@ class Application {
 			nodeContext = NodeImGui::CreateEditor(&config);
 		}
 
-		std::vector<Node> nodes;
+		std::vector<std::unique_ptr<Node>> nodes;
 		std::vector<Link> links;
 
-		void addNode(const Node& node) { nodes.push_back(node); }
+		void addNode(std::unique_ptr<Node> node) {
+			nodes.push_back(std::move(node));
+		}
+
+		Node* findNodeById(NodeImGui::NodeId id) {
+			for (auto& node : nodes) {
+				if (node->id == id) {
+					return node.get();
+				}
+			}
+			return nullptr;
+		}
+
+		Node* findNodeOwningPin(NodeImGui::PinId pin) {
+			for (auto& node : nodes) {
+				if (node->inputs.contains(pin) || node->outputs.contains(pin)) {
+					return node.get();
+				}
+			}
+			return nullptr;
+		}
+
+		Node* findUpstreamNode(Node& targetNode) {
+			if (targetNode.inputs.empty()) {
+				return nullptr;
+			}
+
+			NodeImGui::PinId targetInputPin = targetNode.inputs[0];
+
+			for (auto& link : links) {
+				if (link.endPin == targetInputPin) {
+					return findNodeOwningPin(link.startPin);
+				}
+			}
+
+			return nullptr;
+		}
 
 		void addLink(const Link& link) { links.push_back(link); }
 
 		void removeNode(NodeImGui::NodeId nodeToDelete) {
-			const auto id = std::find_if(
-				nodes.begin(), nodes.end(),
-				[nodeToDelete](auto& node) { return node.id == nodeToDelete; });
+			const auto id = std::find_if(nodes.begin(), nodes.end(),
+										 [nodeToDelete](const auto& node) {
+											 return node->id == nodeToDelete;
+										 });
+
 			if (id != nodes.end()) {
 				nodes.erase(id);
 			}
@@ -352,6 +455,57 @@ class Application {
 			}
 		}
 
+		bool compressBCToDDS(const std::string& inputFile,
+							 const std::string& outputFile,
+							 CompressionNode::CompressionType compressionType) {
+			SDL_Surface* loadedSurface = IMG_Load(inputFile.c_str());
+
+			if (loadedSurface == nullptr) {
+				SDL_Log("IMG_Load failed: %s", SDL_GetError());
+				return false;
+			}
+
+			SDL_Surface* surface =
+				SDL_ConvertSurface(loadedSurface, SDL_PIXELFORMAT_RGBA32);
+
+			SDL_DestroySurface(loadedSurface);
+
+			if (surface == nullptr) {
+				SDL_Log("SDL_ConvertSurface failed: %s", SDL_GetError());
+				return false;
+			}
+
+			encode_output output = {};
+			rdo_bc::rdo_bc_params params = {};
+
+			switch (compressionType) {
+				case CompressionNode::CompressionType::BC7:
+					params.m_dxgi_format = DXGI_FORMAT_BC7_UNORM;
+					break;
+				case CompressionNode::CompressionType::BC3:
+					params.m_dxgi_format = DXGI_FORMAT_BC3_UNORM;
+					break;
+				case CompressionNode::CompressionType::BC2:
+					params.m_dxgi_format = DXGI_FORMAT_BC2_UNORM;
+					break;
+				case CompressionNode::CompressionType::BC1:
+					params.m_dxgi_format = DXGI_FORMAT_BC1_UNORM;
+					break;
+			}
+
+			bc7enc_compress_image_from_memory(surface->w, surface->h,
+											  surface->pixels, params, &output);
+
+			bc7enc_write_encode_output_to_dds(outputFile.c_str(), &output, true,
+											  false);
+
+			bc7enc_free_encode_output(&output);
+			SDL_DestroySurface(surface);
+
+			SDL_Log("Wrote DDS file: %s", outputFile.c_str());
+			return true;
+		}
+
 		void cleanup() const { NodeImGui::DestroyEditor(nodeContext); }
 
 		void render(Application* a) {
@@ -359,136 +513,97 @@ class Application {
 			NodeImGui::Begin("Node Editor");
 
 			for (auto& node : nodes) {
-				NodeImGui::BeginNode(node.id);
+				NodeImGui::BeginNode(node->id);
 
-				ImGui::Text("Node - ID: %lu", node.id.Get());
+			// Push a unique ImGui ID per node to avoid "SameID" collisions
+			// for widgets (buttons, etc.) inside different nodes.
+			ImGui::PushID(static_cast<int>(node->id.Get()));
 
-				for (const auto& inputPin : node.inputs) {
-					NodeImGui::BeginPin(inputPin, NodeImGui::PinKind::Input);
-					ImGui::Text("-> In");
-					NodeImGui::EndPin();
-				}
-				for (const auto& outputPin : node.outputs) {
-					NodeImGui::BeginPin(outputPin, NodeImGui::PinKind::Output);
-					ImGui::Text("Out ->");
-					NodeImGui::EndPin();
-				}
+			ImGui::Text("%s - ID: %lu", node->name(), node->id.Get());
 
-				// problem med att node-imagen bara uppdaterar om man trycker på load-image igen efter man loadat
-				if (node.isInputNode) {
-					//pop and push unique IDs
-					if (ImGui::Button("Import Image")) {
-						SDL_ShowOpenFileDialog(
-							callback, a->renderer, a->window, dialog_filters.data(),
-							SDL_arraysize(dialog_filters), nullptr, true);
-					}
-					if (!original_textures.empty()) {
-						if (ImGui::Button("Load")) { // Right now you HAVE to load the image you imported, otherwise it won't be saved in the node. This could be worked around if you do node-saving in the callback, but I didn't feel like doing that.
-							node.setTexture(original_textures.back());
-							original_textures
-								.pop_back();
-						}
-					}
-					if (node.texture != NULL) {
-						float width, height;
-						SDL_GetTextureSize(node.texture, &width, &height);
-						float scaleFactor =
-							ImGui::GetContentRegionAvail().x / width;
-						ImVec2 scaledSize(
-							width * scaleFactor,
-							height * scaleFactor);	// Scale down the image
-						ImGui::Image(node.texture, scaledSize);
-					}
-				}
-
-				if (node.isOutputNode) {
-					if (ImGui::Button("Process chain")) {
-						//node.process(); ?
-					}
-					if (node.texture!=nullptr) {
-						float width, height;
-						SDL_GetTextureSize(node.texture, &width,
-										   &height);
-						float scaleFactor =
-							ImGui::GetContentRegionAvail().x / width;
-						ImVec2 scaledSize(
-							width * scaleFactor,
-							height * scaleFactor);	// Scale down the image
-						ImGui::Image(node.texture, scaledSize);
-					}
-				}
-
-				for (const auto& link : links) {
-					NodeImGui::Link(link.id, link.startPin, link.endPin);
-				}
-
-				NodeImGui::EndNode();
+			for (const auto& inputPin : node->inputs) {
+				NodeImGui::BeginPin(inputPin, NodeImGui::PinKind::Input);
+				ImGui::Text("-> In");
+				NodeImGui::EndPin();
 			}
 
-			// Create new links between pins
+			node->renderBody(a, *this);
+
+			for (const auto& outputPin : node->outputs) {
+				NodeImGui::BeginPin(outputPin, NodeImGui::PinKind::Output);
+				ImGui::Text("Out ->");
+				NodeImGui::EndPin();
+			}
+
+			ImGui::PopID();
+
+			NodeImGui::EndNode();
+			}
+
+			for (const auto& link : links) {
+				NodeImGui::Link(link.id, link.startPin, link.endPin);
+			}
+
 			if (NodeImGui::BeginCreate()) {
-				NodeImGui::PinId inputPin, outputPin;
-				NodeImGui::NodeId inputNode, outputNode;
-				bool inputIsInput = false;
-				bool outputIsOutput = false;
-				bool numberOfLinksIsLessThanZero = true;
-				if (NodeImGui::QueryNewLink(&inputPin, &outputPin)) {
-					if (inputPin && outputPin && NodeImGui::AcceptNewItem()) {
-						Link link;
-						link.id = uniqueId++;
-						link.startPin = inputPin;
-						link.endPin = outputPin;
-						// make sure output pin actually goes into an input pin
-						// or vice versa (forbid input->input and
-						// output->output)
-						for (const auto& node : nodes) {
-							if (node.inputs.contains(inputPin)) {
-								inputIsInput = true;
-								inputNode = node.id;
+				NodeImGui::PinId firstPin;
+				NodeImGui::PinId secondPin;
+
+				if (NodeImGui::QueryNewLink(&firstPin, &secondPin)) {
+					if (firstPin && secondPin && NodeImGui::AcceptNewItem()) {
+						Node* firstNode = findNodeOwningPin(firstPin);
+						Node* secondNode = findNodeOwningPin(secondPin);
+
+						if (firstNode != nullptr && secondNode != nullptr &&
+							firstNode->id != secondNode->id) {
+							const bool firstIsInput =
+								firstNode->inputs.contains(firstPin);
+							const bool firstIsOutput =
+								firstNode->outputs.contains(firstPin);
+							const bool secondIsInput =
+								secondNode->inputs.contains(secondPin);
+							const bool secondIsOutput =
+								secondNode->outputs.contains(secondPin);
+
+							Link link;
+							link.id = uniqueId++;
+
+							if (firstIsOutput && secondIsInput) {
+								link.startPin = firstPin;
+								link.endPin = secondPin;
+								links.push_back(link);
+							} else if (firstIsInput && secondIsOutput) {
+								link.startPin = secondPin;
+								link.endPin = firstPin;
+								links.push_back(link);
 							}
-							if (node.outputs.contains(outputPin)) {
-								outputIsOutput = true;
-								outputNode = node.id;
-							}
-						}
-						if (inputIsInput && outputIsOutput &&
-								inputNode != outputNode ||
-							!(inputIsInput || outputIsOutput)) {
-							printf("Link Created: %d -> %d with ID %d \n",
-								   static_cast<int>(link.startPin.Get()),
-								   static_cast<int>(link.endPin.Get()),
-								   static_cast<int>(link.id.Get()));
-							links.push_back(link);
 						}
 					}
 				}
+
 				NodeImGui::EndCreate();
 			}
 
-			// Delete links and nodes
 			if (NodeImGui::BeginDelete()) {
 				NodeImGui::LinkId linkId;
+
 				while (NodeImGui::QueryDeletedLink(&linkId)) {
 					if (NodeImGui::AcceptDeletedItem()) {
 						removeLink(linkId);
 					}
 				}
+
 				NodeImGui::NodeId nodeId = 0;
+
 				while (NodeImGui::QueryDeletedNode(&nodeId)) {
 					if (NodeImGui::AcceptDeletedItem()) {
 						removeNode(nodeId);
 					}
 				}
+
 				NodeImGui::EndDelete();
 			}
 
 			NodeImGui::End();
-		}
-
-		void parseLinksToFindPathBetweenInputAndOutput(NodeImGui::NodeId inputNodeId, NodeImGui::NodeId outputNodeId) {
-			// Implement a graph traversal algorithm (like BFS or DFS) to find a path
-			// between the input node and the output node using the links.
-			// This is a placeholder for the actual implementation.
 		}
 
 		void reset() {
@@ -497,6 +612,12 @@ class Application {
 			uniqueId = 1;
 		}
 	};
+
+		void parseLinksToFindPathBetweenInputAndOutput(NodeImGui::NodeId inputNodeId, NodeImGui::NodeId outputNodeId) {
+			// Implement a graph traversal algorithm (like BFS or DFS) to find a path
+			// between the input node and the output node using the links.
+			// This is a placeholder for the actual implementation.
+		}
 
 	NodeEditor nodeEditor;
 
@@ -561,38 +682,60 @@ class Application {
 	// Function to create a node with 2 input pins and 2 outputs, has no
 	// specific type, just a generic node for testing
 	void CreateNode() {
-		NodeEditor::Node node;
-		node.id = nodeEditor.getUniqueId();
+		auto node = std::make_unique<NodeEditor::Node>();
+
+		node->id = nodeEditor.getUniqueId();
+
 
 		for (int i = 0; i < 2; ++i) {
-			NodeImGui::PinId inputPinId = nodeEditor.getUniquePinId();
-			node.inputs.push_back(inputPinId);
+			node->inputs.push_back(nodeEditor.getUniquePinId());
 		}
 
 		for (int i = 0; i < 2; ++i) {
-			NodeImGui::PinId outputPinId = nodeEditor.getUniquePinId();
-			node.outputs.push_back(outputPinId);
+			node->outputs.push_back(nodeEditor.getUniquePinId());
 		}
 
-		nodeEditor.addNode(node);
+		ImVec2 center = ImGui::GetMainViewport()->GetCenter();
+		NodeImGui::SetNodePosition(node->id, ImVec2(center.x, center.y));
+
+		nodeEditor.addNode(std::move(node));
 	}
 
 	void CreateInputNode() {
-		NodeEditor::InputNode node;
-		node.id = nodeEditor.getUniqueId();
-		NodeImGui::PinId outputPinId = nodeEditor.getUniquePinId();
-		node.outputs.push_back(outputPinId);
-		node.isInputNode = true;
-		nodeEditor.addNode(node);
+		auto node = std::make_unique<NodeEditor::InputNode>();
+
+		node->id = nodeEditor.getUniqueId();
+		node->outputs.push_back(nodeEditor.getUniquePinId());
+
+		ImVec2 center = ImGui::GetMainViewport()->GetCenter();
+		NodeImGui::SetNodePosition(node->id, ImVec2(center.x, center.y));
+
+		nodeEditor.addNode(std::move(node));
 	}
 
 	void CreateOutputNode() {
-		NodeEditor::OutputNode node;
-		node.id = nodeEditor.getUniqueId();
-		NodeImGui::PinId inputPinId = nodeEditor.getUniquePinId();
-		node.inputs.push_back(inputPinId);
-		node.isOutputNode = true;
-		nodeEditor.addNode(node);
+		auto node = std::make_unique<NodeEditor::OutputNode>();
+
+		node->id = nodeEditor.getUniqueId();
+		node->inputs.push_back(nodeEditor.getUniquePinId());
+
+		ImVec2 center = ImGui::GetMainViewport()->GetCenter();
+		NodeImGui::SetNodePosition(node->id, ImVec2(center.x, center.y));
+
+		nodeEditor.addNode(std::move(node));
+	}
+
+	void CreateCompressionNode(NodeEditor::CompressionNode::CompressionType compressionType) {
+		auto node = std::make_unique<NodeEditor::CompressionNode>();
+		node->compressionType = compressionType;
+		node->id = nodeEditor.getUniqueId();
+		node->inputs.push_back(nodeEditor.getUniquePinId());
+		node->outputs.push_back(nodeEditor.getUniquePinId());
+
+		ImVec2 center = ImGui::GetMainViewport()->GetCenter();
+		NodeImGui::SetNodePosition(node->id, ImVec2(center.x, center.y));
+
+		nodeEditor.addNode(std::move(node));
 	}
 
 	static void HelpMarker(const char* desc) {
@@ -679,6 +822,7 @@ class Application {
 			if (ImGui::Button("Create Output Node")) {
 				CreateOutputNode();
 			}
+
 			ImGui::SameLine();
 			HelpMarker(
 				"This node will be used to view the processed images. You can "
@@ -790,17 +934,29 @@ class Application {
 			ImGui::BeginChild("ChildC", ImVec2(0, 160));
 			if (ImGui::BeginTable("Compression table", 1)) {
 				ImGui::TableNextColumn();
-				if (ImGui::Button("BC7")) {
+
+				if (ImGui::Button("Create BC7 Compression Node")) {
+					CreateCompressionNode(NodeEditor::CompressionNode::CompressionType::BC7);
 				}
 				if (ImGui::Button("BC6S")) {
 				}
 				if (ImGui::Button("ASTC")) {
 				}
 
-				if (ImGui::Button("BC3")) {
+				if (ImGui::Button("Create BC3 Compression Node")) {
+					CreateCompressionNode(
+						NodeEditor::CompressionNode::CompressionType::BC3);
 				}
 
-				if (ImGui::Button("BC1")) {
+				if (ImGui::Button("Create BC2 Compression Node")) {
+					CreateCompressionNode(
+						NodeEditor::CompressionNode::CompressionType::BC2);
+				}
+
+				if (ImGui::Button("Create BC1 Compression Node")) {
+
+					CreateCompressionNode(
+						NodeEditor::CompressionNode::CompressionType::BC1);
 				}
 
 				if (ImGui::Button("8")) {
@@ -993,7 +1149,7 @@ class Application {
 			// ------ individual window features code here
 
 			// Show demo window.
-			ImGui::ShowDemoWindow();
+			//ImGui::ShowDemoWindow();
 
 			// Render the ImGui frame.
 			ImGui::Render();
