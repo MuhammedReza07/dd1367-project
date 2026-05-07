@@ -98,7 +98,7 @@ static void processImages(SDL_Renderer* renderer) {
 			printf("compressed! blocks %d bpb %d mips %d\n", output.num_blocks,
 				   output.bytes_per_block, output.mipmap_count);
 
-			bc7enc_write_encode_output_to_dds("test.dds", &output, true, false);
+			bc7enc_write_encode_output_to_dds("test.dds", &output, false, false);
 			bc7enc_free_encode_output(&output);
 
 			// ADD PROCESSING LOGIC HERE!
@@ -303,7 +303,7 @@ class Application {
 
 		class CompressionNode : public Node {
 		   public:
-			enum class CompressionType { BC7, BC3, BC2, BC1 };
+			enum class CompressionType { BC7, BC5, BC4, BC3, BC2, BC1 };
 
 			CompressionType compressionType = CompressionType::BC7;
 
@@ -313,6 +313,12 @@ class Application {
 			switch (compressionType) {
 				case CompressionType::BC7:
 					ImGui::Text("Compression: BC7");
+					break;
+				case CompressionType::BC5:
+					ImGui::Text("Compression: BC5");
+					break;
+				case CompressionType::BC4:
+					ImGui::Text("Compression: BC4");
 					break;
 				case CompressionType::BC3:
 					ImGui::Text("Compression: BC3");
@@ -344,6 +350,21 @@ class Application {
 					case CompressionType::BC7:
 						outputFile = "output_bc7.dds";
 						if (!editor.compressBCToDDS(inputNode->sourceFile, outputFile, compressionType)) {
+							return false;
+						}
+						break;
+					case CompressionType::BC5:
+						outputFile = "output_bc5.dds";
+						if (!editor.compressBCToDDS(inputNode->sourceFile,
+													 outputFile, compressionType)) {
+							return false;
+						}
+						break;
+					case CompressionType::BC4:
+						outputFile = "output_bc4.dds";
+						if (!editor.compressBCToDDS(inputNode->sourceFile,
+													outputFile,
+													compressionType)) {
 							return false;
 						}
 						break;
@@ -418,18 +439,31 @@ class Application {
 		}
 
 		Node* findUpstreamNode(Node& targetNode) {
-			if (targetNode.inputs.empty()) {
+            if (targetNode.inputs.empty()) {
+				SDL_Log("findUpstreamNode: target node %lu has no inputs", targetNode.id.Get());
 				return nullptr;
 			}
 
-			NodeImGui::PinId targetInputPin = targetNode.inputs[0];
+			SDL_Log("findUpstreamNode: target node %lu has %d input pins", targetNode.id.Get(), (int)targetNode.inputs.size());
 
-			for (auto& link : links) {
-				if (link.endPin == targetInputPin) {
-					return findNodeOwningPin(link.startPin);
+			// Search all input pins for an incoming link.
+			for (const auto& targetInputPin : targetNode.inputs) {
+				SDL_Log("findUpstreamNode: checking inputPin %lu for node %lu", targetInputPin.Get(), targetNode.id.Get());
+				for (const auto& link : links) {
+					SDL_Log(" findUpstreamNode: link id=%lu start=%lu end=%lu", link.id.Get(), link.startPin.Get(), link.endPin.Get());
+					if (link.endPin == targetInputPin) {
+						Node* owner = findNodeOwningPin(link.startPin);
+						if (owner) {
+							SDL_Log("findUpstreamNode: found upstream node %lu via link %lu", owner->id.Get(), link.id.Get());
+						} else {
+							SDL_Log("findUpstreamNode: found link %lu but owner not found for startPin %lu", link.id.Get(), link.startPin.Get());
+						}
+						return owner;
+					}
 				}
 			}
 
+			SDL_Log("findUpstreamNode: no upstream found for node %lu", targetNode.id.Get());
 			return nullptr;
 		}
 
@@ -482,6 +516,12 @@ class Application {
 				case CompressionNode::CompressionType::BC7:
 					params.m_dxgi_format = DXGI_FORMAT_BC7_UNORM;
 					break;
+				case CompressionNode::CompressionType::BC5:
+					params.m_dxgi_format = DXGI_FORMAT_BC5_UNORM;
+					break;
+				case CompressionNode::CompressionType::BC4:
+					params.m_dxgi_format = DXGI_FORMAT_BC4_UNORM;
+					break;
 				case CompressionNode::CompressionType::BC3:
 					params.m_dxgi_format = DXGI_FORMAT_BC3_UNORM;
 					break;
@@ -496,7 +536,10 @@ class Application {
 			bc7enc_compress_image_from_memory(surface->w, surface->h,
 											  surface->pixels, params, &output);
 
-			bc7enc_write_encode_output_to_dds(outputFile.c_str(), &output, true,
+            // Don't force sRGB in the DDS header here; respect the
+			// encoder's DXGI format instead. Passing 'false' avoids
+			// accidentally writing BC7 as an sRGB variant.
+			bc7enc_write_encode_output_to_dds(outputFile.c_str(), &output, false,
 											  false);
 
 			bc7enc_free_encode_output(&output);
@@ -571,10 +614,12 @@ class Application {
 								link.startPin = firstPin;
 								link.endPin = secondPin;
 								links.push_back(link);
+                    SDL_Log("Created link id=%lu start=%lu end=%lu", link.id.Get(), link.startPin.Get(), link.endPin.Get());
 							} else if (firstIsInput && secondIsOutput) {
 								link.startPin = secondPin;
 								link.endPin = firstPin;
 								links.push_back(link);
+                   SDL_Log("Created link id=%lu start=%lu end=%lu", link.id.Get(), link.startPin.Get(), link.endPin.Get());
 							}
 						}
 					}
@@ -941,6 +986,16 @@ class Application {
 				if (ImGui::Button("BC6S")) {
 				}
 				if (ImGui::Button("ASTC")) {
+				}
+
+				if (ImGui::Button("Create BC5 Compression Node")) {
+					CreateCompressionNode(
+						NodeEditor::CompressionNode::CompressionType::BC5);
+				}
+
+				if (ImGui::Button("Create BC4 Compression Node")) {
+					CreateCompressionNode(
+						NodeEditor::CompressionNode::CompressionType::BC4);
 				}
 
 				if (ImGui::Button("Create BC3 Compression Node")) {
