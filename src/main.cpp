@@ -352,6 +352,15 @@ class Application {
 			}
 		}
 
+		bool linkExists(NodeImGui::PinId startPin, NodeImGui::PinId endPin) {
+			return std::any_of(
+				links.begin(), links.end(),
+				[startPin, endPin](const Link& link) {
+					return (link.startPin == startPin && link.endPin == endPin) ||
+						   (link.startPin == endPin && link.endPin == startPin);
+				});
+		}
+
 		void cleanup() const { NodeImGui::DestroyEditor(nodeContext); }
 
 		void render(Application* a) {
@@ -427,33 +436,54 @@ class Application {
 
 			// Create new links between pins
 			if (NodeImGui::BeginCreate()) {
-				NodeImGui::PinId inputPin, outputPin;
-				NodeImGui::NodeId inputNode, outputNode;
-				bool inputIsInput = false;
-				bool outputIsOutput = false;
-				bool numberOfLinksIsLessThanZero = true;
-				if (NodeImGui::QueryNewLink(&inputPin, &outputPin)) {
-					if (inputPin && outputPin && NodeImGui::AcceptNewItem()) {
+				NodeImGui::PinId source, destination;
+				NodeImGui::NodeId sourceNode, destinationNode;
+				if (NodeImGui::QueryNewLink(&source, &destination)) {
+					if (source && destination && NodeImGui::AcceptNewItem() && !linkExists(source, destination)) {
+						bool sourceIsInput = false;
+						bool destinationIsOutput = false;
+						bool sourceIsOutput = false;
+						bool destinationIsInput = false;
+						bool sameNode = false;
+						bool valid = false;
+						bool numberOfLinksIsLessThanZero =
+							true;  // tvinga eventuellt 1 link per pin? (ej
+								   // implementerat än)
 						Link link;
 						link.id = uniqueId++;
-						link.startPin = inputPin;
-						link.endPin = outputPin;
 						// make sure output pin actually goes into an input pin
 						// or vice versa (forbid input->input and
 						// output->output)
 						for (const auto& node : nodes) {
-							if (node.inputs.contains(inputPin)) {
-								inputIsInput = true;
-								inputNode = node.id;
+							if (node.inputs.contains(source)) {
+								sourceIsInput = true;
+								sourceNode = node.id;
 							}
-							if (node.outputs.contains(outputPin)) {
-								outputIsOutput = true;
-								outputNode = node.id;
+							if (node.outputs.contains(destination)) {
+								destinationIsOutput = true;
+								destinationNode = node.id;
+							}
+							if (node.outputs.contains(source)) {
+								sourceIsOutput = true;
+								sourceNode = node.id;
+							}
+							if (node.inputs.contains(destination)) {
+								destinationIsInput = true;
+								destinationNode = node.id;
 							}
 						}
-						if (inputIsInput && outputIsOutput &&
-								inputNode != outputNode ||
-							!(inputIsInput || outputIsOutput)) {
+
+						if ((sourceIsInput && destinationIsOutput)) {
+							link.startPin = source;
+							link.endPin = destination;
+							valid = true;
+						} else if (sourceIsOutput && destinationIsInput) {
+							valid = true;
+							link.endPin = source;
+							link.startPin = destination;
+						}
+
+						if (valid && (sourceNode!=destinationNode)) {
 							printf("Link Created: %d -> %d with ID %d \n",
 								   static_cast<int>(link.startPin.Get()),
 								   static_cast<int>(link.endPin.Get()),
