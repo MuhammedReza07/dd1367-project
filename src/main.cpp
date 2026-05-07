@@ -485,14 +485,9 @@ class Application {
 				if (node.isOutputNode) {
 					if (ImGui::Button("Process chain")) {
 						std::vector<Node*> path = findPathBetweenInputAndOutput(node.id);
-
 						processPath(path);
-
-						for (auto& node : path){
-							printf("node: %d", node->id);
-						}
-
-						node.setTexture(node.texture);
+						
+						node.setTexture(path.back()->texture);
 
 						if (node.texture != NULL) {
 							float width, height;
