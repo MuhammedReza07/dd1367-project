@@ -1,7 +1,5 @@
 // Because the application is providing its own entry point.
 #define SDL_MAIN_HANDLED 0x39  // NOLINT
-
-#include <SDL3/SDL.h>
 #include <SDL3/SDL_dialog.h>
 #include <SDL3/SDL_main.h>
 #include <SDL3_image/SDL_image.h>
@@ -15,6 +13,9 @@
 #include <array>
 #include <string>
 #include <vector>
+#include <stack>
+#include <unordered_set>
+#include <queue>
 
 namespace NodeImGui = ax::NodeEditor;
 
@@ -148,6 +149,8 @@ class Application {
 			virtual void process() {
 				// implement specific processing logic for different nodes
 			}
+
+
 		};
 
 		class InputNode : public Node {
@@ -313,6 +316,61 @@ class Application {
 			}
 		};
 
+		struct GraphEdge {
+			Node* source;
+			Node* destination;
+		};
+
+		
+		// Will return the node-path as a vector of Node* from the output node
+		// to the input node, or an empty vector if no path exists
+		std::vector<Node*> findPathBetweenInputAndOutput(
+			NodeImGui::NodeId outputNodeId) {
+			std::stack<std::pair<Node*, std::vector<Node*>>>
+				st;	 // branch stack and saved branch paths
+			std::unordered_set<Node*> visited;
+			std::vector<Node*> path = {};
+			Node* currentNode = nodeIdToNode(outputNodeId);
+
+			st.push(std::make_pair(currentNode, path));
+
+			while (!st.empty()) {
+				currentNode = st.top().first;
+				path = st.top().second;
+				st.pop();
+
+				if (visited.find(currentNode) != visited.end()) {
+					continue;
+				}
+				visited.insert(currentNode);
+				path.push_back(currentNode);
+				
+				if (currentNode->isInputNode) {
+					std::reverse(path.begin(), path.end());
+					return path;
+				}
+
+				for (const auto& edge : graphEdges) {
+					if (edge.destination == currentNode) {
+						if (visited.find(edge.source) == visited.end()) {
+							st.push(std::make_pair(edge.source, path));
+						}
+					}
+				}
+			}
+			return {};
+		}
+
+		void processPath(std::vector<Node*> path) { 
+			if (!path.empty()) {
+				Node* previousNode = path.front();	// input node
+				for (auto& node : path) {
+					node->texture = previousNode->texture;
+					node->process();
+				}
+			}
+		}
+
 		NodeImGui::NodeId getUniqueId() {
 			return NodeImGui::NodeId(uniqueId++);
 		}
@@ -329,6 +387,15 @@ class Application {
 
 		std::vector<Node> nodes;
 		std::vector<Link> links;
+		std::vector<GraphEdge> graphEdges;
+
+		Node* nodeIdToNode(NodeImGui::NodeId inputId) {
+			for (auto& node : nodes) {
+				if (node.id == inputId) {
+					return &node;
+				}
+			}
+		}
 
 		void addNode(const Node& node) { nodes.push_back(node); }
 
@@ -357,6 +424,13 @@ class Application {
 					return (link.startPin == startPin && link.endPin == endPin) ||
 						   (link.startPin == endPin && link.endPin == startPin);
 				});
+		}
+
+		bool nodesAlreadyConnected(NodeImGui::NodeId nodeA, NodeImGui::NodeId nodeB) {
+			// rimligtvis ska detta vara en check som förhindrar cykler vid link-creation
+			// (alltså att en nod ger en annan nod output, och sedan får den input från samm nod (vare sig direkt eller indirekt)
+			// men jag orkar inte implementera DFS/BFS just nu
+			return false;
 		}
 
 		void cleanup() const { NodeImGui::DestroyEditor(nodeContext); }
@@ -410,7 +484,27 @@ class Application {
 
 				if (node.isOutputNode) {
 					if (ImGui::Button("Process chain")) {
-						//node.process(); ?
+						std::vector<Node*> path = findPathBetweenInputAndOutput(node.id);
+
+						processPath(path);
+
+						for (auto& node : path){
+							printf("node: %d", node->id);
+						}
+
+						node.setTexture(node.texture);
+
+						if (node.texture != NULL) {
+							float width, height;
+							SDL_GetTextureSize(node.texture, &width, &height);
+							float scaleFactor =
+								ImGui::GetContentRegionAvail().x / width;
+							ImVec2 scaledSize(
+								width * scaleFactor,
+								height * scaleFactor);	// Scale down the image
+							ImGui::Image(node.texture, scaledSize);
+						}
+
 					}
 					if (node.texture!=nullptr) {
 						float width, height;
@@ -480,12 +574,22 @@ class Application {
 							link.startPin = destination;
 						}
 
-						if (valid && (sourceNode!=destinationNode)) {
+						if (valid && (sourceNode!=destinationNode) && !nodesAlreadyConnected(sourceNode, destinationNode)) {
 							printf("Link Created: %d -> %d with ID %d \n",
 								   static_cast<int>(link.startPin.Get()),
 								   static_cast<int>(link.endPin.Get()),
 								   static_cast<int>(link.id.Get()));
+									
+							GraphEdge edge;
+							edge.destination = nodeIdToNode(destinationNode);
+							edge.source = nodeIdToNode(sourceNode);
+							graphEdges.push_back(edge);
 							links.push_back(link);
+
+							for (const auto& edge : graphEdges) {
+								printf(" edges list now : %d, %d", edge.source->id,
+									   edge.destination->id);
+							}
 						}
 					}
 				}
@@ -511,13 +615,10 @@ class Application {
 
 			NodeImGui::End();
 		}
-
-		std::vector<Node> parseLinksToFindPathBetweenInputAndOutput(
-			NodeImGui::NodeId outputNodeId) {
-			
-		}
+		
 
 		void reset() {
+			graphEdges.clear();
 			nodes.clear();
 			links.clear();
 			uniqueId = 1;
@@ -590,12 +691,11 @@ class Application {
 		NodeEditor::Node node;
 		node.id = nodeEditor.getUniqueId();
 
-			NodeImGui::PinId inputPinId = nodeEditor.getUniquePinId();
-			node.inputs.push_back(inputPinId);
+		NodeImGui::PinId inputPinId = nodeEditor.getUniquePinId();
+		node.inputs.push_back(inputPinId);
 
-			NodeImGui::PinId outputPinId = nodeEditor.getUniquePinId();
-			node.outputs.push_back(outputPinId);
-
+		NodeImGui::PinId outputPinId = nodeEditor.getUniquePinId();
+		node.outputs.push_back(outputPinId);
 
 		nodeEditor.addNode(node);
 	}
