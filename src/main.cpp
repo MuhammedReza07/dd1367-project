@@ -109,7 +109,7 @@ class Application {
 		int uniqueId = 1;
 
 	    public:
-		NodeImGui::NodeId spawnNodeId = 0;
+
 		struct Link {
 			NodeImGui::LinkId id;
 			NodeImGui::PinId startPin;
@@ -154,7 +154,6 @@ class Application {
 				return true;
 			}
 
-			void setTexture(SDL_Texture* newTexture) { texture = newTexture; }
 		};
 
 		//Structure that keeps track of a link's source and destination Node
@@ -402,6 +401,52 @@ class Application {
 					}
 				}
 
+
+
+				// Choose an output filename. Prefer a descriptive name using
+				// the
+				// source file base name and compression type so it's easy to
+				// find.
+				std::string typeName;
+				switch (compressionType) {
+					case CompressionType::BC7:
+						typeName = "BC7";
+						break;
+					case CompressionType::BC5:
+						typeName = "BC5";
+						break;
+					case CompressionType::BC4:
+						typeName = "BC4";
+						break;
+					case CompressionType::BC3:
+						typeName = "BC3";
+						break;
+					case CompressionType::BC2:
+						typeName = "BC2";
+						break;
+					case CompressionType::BC1:
+						typeName = "BC1";
+						break;
+					default:
+						typeName = "BC";
+						break;
+				}
+
+				std::string outName;
+				if (!inputNode->sourceFile.empty()) {
+					// Strip path and extension from sourceFile
+					const std::string& src = inputNode->sourceFile;
+					size_t slash = src.find_last_of("/\\");
+					std::string fname = (slash == std::string::npos)
+											? src
+											: src.substr(slash + 1);
+					size_t dot = fname.find_last_of('.');
+					if (dot != std::string::npos) fname = fname.substr(0, dot);
+					outName = fname + "_" + typeName + ".dds";
+				} else {
+					outName = typeName + "_compressed.dds";
+				}
+
 				// Compress to blocks and store on this node.
 				std::vector<char> blocks;
 				int w = 0, h = 0, bytes_per_block = 0, num_blocks = 0, format = 0;
@@ -416,39 +461,17 @@ class Application {
 				this->compressedBytesPerBlock = bytes_per_block;
 				this->compressedNumBlocks = num_blocks;
                 this->compressedFormat = format;
-            // Choose an output filename. Prefer a descriptive name using the
-			// source file base name and compression type so it's easy to find.
-			std::string typeName;
-			switch (compressionType) {
-				case CompressionType::BC7: typeName = "BC7"; break;
-				case CompressionType::BC5: typeName = "BC5"; break;
-				case CompressionType::BC4: typeName = "BC4"; break;
-				case CompressionType::BC3: typeName = "BC3"; break;
-				case CompressionType::BC2: typeName = "BC2"; break;
-				case CompressionType::BC1: typeName = "BC1"; break;
-				default: typeName = "BC"; break;
-			}
 
-			std::string outName;
-			if (!inputNode->sourceFile.empty()) {
-				// Strip path and extension from sourceFile
-				const std::string& src = inputNode->sourceFile;
-				size_t slash = src.find_last_of("/\\");
-				std::string fname = (slash == std::string::npos) ? src : src.substr(slash + 1);
-				size_t dot = fname.find_last_of('.');
-				if (dot != std::string::npos) fname = fname.substr(0, dot);
-				outName = fname + "_" + typeName + ".dds";
-			} else {
-				outName = typeName + "_compressed.dds";
-			}
-
-			// Attempt to write DDS for inspection (works for BC7 via libbc7enc and
-			// BC1/3/4/5 via rgbcx path implemented in compressSurfaceToDDS).
-			if (editor.compressSurfaceToDDS(surfaceToCompress, outName, compressionType)) {
-				outputFile = outName;
-				SDL_Log("Compression node wrote DDS: %s", outputFile.c_str());
-			} else {
-				SDL_Log("Compression node failed to write DDS: %s", outName.c_str());
+				if (!editor.writeBlockstoDDS(
+						this->compressedBlocks, this->compressedWidth,
+						this->compressedHeight, this->compressedBytesPerBlock,
+						this->compressedNumBlocks, this->compressedFormat,
+						outName)){
+					outputFile = outName;
+					SDL_Log("Compression node wrote DDS: %s", outputFile.c_str());
+				}else{
+				SDL_Log("Compression node failed to write DDS: %s",
+						outName.c_str());
 				outputFile = "";
 			}
 
@@ -511,55 +534,6 @@ class Application {
 		std::vector<Link> links;
 		std::vector<GraphEdge> graphEdges;
 
-		// Run a quick single-block encode->decode round-trip test for BC1.
-		void runRoundTripTest() {
-			SDL_Log("RoundTripTest: Starting BC1 encode->decode round-trip test");
-			// Prepare a 4x4 test block (checkerboard)
-			uint8_t src_pixels[16 * 4];
-			for (int py = 0; py < 4; ++py) {
-				for (int px = 0; px < 4; ++px) {
-					int i = (py * 4 + px) * 4;
-					bool on = ((px + py) & 1) == 0;
-					src_pixels[i + 0] = on ? 255 : 0;
-					src_pixels[i + 1] = on ? 255 : 0;
-					src_pixels[i + 2] = on ? 255 : 0;
-					src_pixels[i + 3] = 255;
-				}
-			}
-
-			uint8_t block[8];
-			memset(block, 0, sizeof(block));
-			// Encode using same fast parameters as production (quality 0)
-			rgbcx::encode_bc1(0, block, src_pixels, false, false);
-
-			// Attempt to decode
-			uint8_t decoded[16 * 4];
-			memset(decoded, 0, sizeof(decoded));
-			bool ok = rgbcx::unpack_bc1(block, decoded, true, rgbcx::bc1_approx_mode::cBC1Ideal);
-			if (ok) {
-				SDL_Log("RoundTripTest: unpack_bc1 succeeded");
-				// write a tiny BMP for inspection
-				SDL_Surface* surf = SDL_CreateSurface(4, 4, SDL_PIXELFORMAT_RGBA32);
-				if (surf) {
-					if (SDL_MUSTLOCK(surf)) SDL_LockSurface(surf);
-					memcpy(surf->pixels, decoded, sizeof(decoded));
-					if (SDL_MUSTLOCK(surf)) SDL_UnlockSurface(surf);
-					if (SDL_SaveBMP(surf, "roundtrip_decoded.bmp") == 0) {
-						SDL_Log("RoundTripTest: wrote roundtrip_decoded.bmp");
-					} else {
-						SDL_Log("RoundTripTest: failed to write roundtrip_decoded.bmp: %s", SDL_GetError());
-					}
-					SDL_DestroySurface(surf);
-				} else {
-					SDL_Log("RoundTripTest: SDL_CreateSurface failed: %s", SDL_GetError());
-				}
-			} else {
-				SDL_Log("RoundTripTest: unpack_bc1 failed on encoded block");
-				// dump encoded block for inspection
-				std::ofstream ofs("roundtrip_block_bc1.bin", std::ios::binary);
-				if (ofs) ofs.write(reinterpret_cast<const char*>(block), sizeof(block));
-			}
-		}
 
 		void addNode(std::unique_ptr<Node> node) {
 			nodes.push_back(std::move(node));
@@ -650,69 +624,6 @@ class Application {
 		}
 
 
-		bool compressBC(SDL_Surface* inputSurface,
-			CompressionNode::CompressionType compressionType) {
-			if (inputSurface == nullptr) {
-				SDL_Log("compressBC: inputSurface is null");
-				return false;
-			}
-
-			if (inputSurface == nullptr) {
-				SDL_Log("IMG_Load failed: %s", SDL_GetError());
-				return false;
-			}
-
-			SDL_Surface* surface =
-				SDL_ConvertSurface(inputSurface, SDL_PIXELFORMAT_RGBA32);
-
-			SDL_DestroySurface(inputSurface);
-
-			if (surface == nullptr) {
-				SDL_Log("SDL_ConvertSurface failed: %s", SDL_GetError());
-				return false;
-			}
-
-			encode_output output = {};
-			rdo_bc::rdo_bc_params params = {};
-
-			switch (compressionType) {
-				case CompressionNode::CompressionType::BC7:
-					params.m_dxgi_format = DXGI_FORMAT_BC7_UNORM;
-					break;
-				case CompressionNode::CompressionType::BC5:
-					params.m_dxgi_format = DXGI_FORMAT_BC5_UNORM;
-					break;
-				case CompressionNode::CompressionType::BC4:
-					params.m_dxgi_format = DXGI_FORMAT_BC4_UNORM;
-					break;
-				case CompressionNode::CompressionType::BC3:
-					params.m_dxgi_format = DXGI_FORMAT_BC3_UNORM;
-					break;
-				case CompressionNode::CompressionType::BC2:
-					params.m_dxgi_format = DXGI_FORMAT_BC2_UNORM;
-					break;
-				case CompressionNode::CompressionType::BC1:
-					params.m_dxgi_format = DXGI_FORMAT_BC1_UNORM;
-					break;
-			}
-
-            bc7enc_compress_image_from_memory(surface->w, surface->h,
-					 surface->pixels, params, &output);
-
-			 // For this helper we only want to produce compressed blocks in memory.
-			 size_t totalBytes = static_cast<size_t>(output.num_blocks) * static_cast<size_t>(output.bytes_per_block);
-			 if (output.blocks && totalBytes > 0) {
-				 // Caller must copy output.blocks if they want to keep them; here we
-				 // just log and then free the encoder output.
-				 SDL_Log("compressBC: produced %d blocks (%zu bytes)", output.num_blocks, totalBytes);
-			 }
-
-			 bc7enc_free_encode_output(&output);
-			 SDL_DestroySurface(surface);
-
-			 return true;
-		}
-
 		// Compress an in-memory SDL_Surface to a DDS file using the specified
 		// compression type. Useful when the pipeline keeps data in-memory
 		// instead of writing intermediate files.
@@ -727,6 +638,7 @@ class Application {
 				 int& outNumBlocks,
 				 int& outFormat,
 				 CompressionNode::CompressionType compressionType) {
+			SDL_Log("compressSurfaceToBlocks: starting compression for type %d", (int)compressionType);
 			if (inputSurface == nullptr) {
 				SDL_Log("compressSurfaceToBlocks: inputSurface is null");
 				return false;
@@ -844,37 +756,13 @@ class Application {
 			}
 		}
 
-		bool compressSurfaceToDDS(SDL_Surface* inputSurface,
-						 const std::string& outputFile,
-					 CompressionNode::CompressionType compressionType) {
-			if (inputSurface == nullptr) {
-				SDL_Log("compressSurfaceToDDS: inputSurface is null");
-				return false;
-			}
-
-			SDL_Surface* surface =
-				SDL_ConvertSurface(inputSurface, SDL_PIXELFORMAT_RGBA32);
-			if (surface == nullptr) {
-				SDL_Log("SDL_ConvertSurface failed: %s", SDL_GetError());
-				return false;
-			}
-
-            // Use the generic block compressor to obtain compressed blocks and
-			// metadata, then write a DDS file with a DX10 header so tools can
-			// inspect the raw compressed data regardless of which encoder was
-			// used (libbc7enc or rgbcx).
-			std::vector<char> blocks;
-			int w = 0, h = 0, bytes_per_block = 0, num_blocks = 0, format = 0;
-			if (!compressSurfaceToBlocks(inputSurface, blocks, w, h, bytes_per_block, num_blocks, format, compressionType)) {
-				SDL_Log("compressSurfaceToDDS: failed to compress surface to blocks");
-				SDL_DestroySurface(surface);
-				return false;
-			}
+		bool writeBlockstoDDS(std::vector<char> blocks,
+								  int w, int h, int bytes_per_block,
+								  int num_blocks, int format, const std::string& outputFile) {
 
 			size_t totalBytes = blocks.size();
 			if (totalBytes == 0) {
-				SDL_Log("compressSurfaceToDDS: no compressed data to write");
-				SDL_DestroySurface(surface);
+				SDL_Log("compressBlockstoDDS: no compressed data to write");
 				return false;
 			}
 
@@ -958,8 +846,7 @@ class Application {
 
 			std::ofstream ofs(outputFile, std::ios::binary);
 			if (!ofs) {
-				SDL_Log("compressSurfaceToDDS: failed to open output file: %s", outputFile.c_str());
-				SDL_DestroySurface(surface);
+				SDL_Log("compressBlockstoDDS: failed to open output file: %s", outputFile.c_str());
 				return false;
 			}
 
@@ -973,8 +860,7 @@ class Application {
 			ofs.write(blocks.data(), static_cast<std::streamsize>(totalBytes));
 			ofs.close();
 
-			SDL_Log("compressSurfaceToDDS: wrote %zu bytes to %s", totalBytes, outputFile.c_str());
-			SDL_DestroySurface(surface);
+			SDL_Log("compressBlockstoDDS: wrote %zu bytes to %s", totalBytes, outputFile.c_str());
 			return true;
 		}
 
@@ -1195,101 +1081,6 @@ class Application {
 		}
 
 
-		// Decode an encode_output (from libbc7enc) into an SDL_Surface for
-		// previewing. Currently supports BC7 via bc7decomp, and BC1,3-5 via rgbx
-		SDL_Surface* decodeEncodeOutputToSurface(const encode_output& out) {
-			if (out.blocks == nullptr || out.num_blocks <= 0 || out.width <= 0 || out.height <= 0) {
-				return nullptr;
-			}
-
-			const int width = out.width;
-			const int height = out.height;
-			const int bytes_per_pixel = 4;
-			std::vector<uint8_t> pixels(static_cast<size_t>(width) * static_cast<size_t>(height) * bytes_per_pixel);
-
-			int blocks_x = (width + 3) / 4;
-			int blocks_y = (height + 3) / 4;
-
-         for (int by = 0; by < blocks_y; ++by) {
-				for (int bx = 0; bx < blocks_x; ++bx) {
-					int block_index = by * blocks_x + bx;
-					if (block_index >= out.num_blocks) break;
-					const uint8_t* block_ptr = reinterpret_cast<const uint8_t*>(out.blocks) + static_cast<size_t>(block_index) * static_cast<size_t>(out.bytes_per_block);
-                   // decode into 16 RGBA pixels (4 bytes each)
-					uint8_t block_pixels[16 * 4];
-					memset(block_pixels, 0, sizeof(block_pixels));
-
-					if (out.format == DXGI_FORMAT_BC7_UNORM) {
-						bc7decomp::color_rgba out_colors[16];
-						bc7decomp::unpack_bc7(block_ptr, out_colors);
-						for (int i = 0; i < 16; ++i) {
-							block_pixels[i * 4 + 0] = out_colors[i].r;
-							block_pixels[i * 4 + 1] = out_colors[i].g;
-							block_pixels[i * 4 + 2] = out_colors[i].b;
-							block_pixels[i * 4 + 3] = out_colors[i].a;
-						}
-					} else if (out.format == DXGI_FORMAT_BC1_UNORM) {
-						// BC1 -> use rgbcx::unpack_bc1
-						rgbcx::color32 tmp[16];
-						// rgbcx provides unpack_bc1 that can fill RGBA pixels; use temporary buffer
-						rgbcx::unpack_bc1(block_ptr, block_pixels, true,
-										  rgbcx::bc1_approx_mode::cBC1Ideal);
-					} else if (out.format == DXGI_FORMAT_BC3_UNORM) {
-						// BC3 (DXT5)
-						rgbcx::unpack_bc3(block_ptr, block_pixels);
-					} else if (out.format == DXGI_FORMAT_BC4_UNORM) {
-						// BC4 = single channel; unpack to single byte per pixel then expand
-						uint8_t single[16];
-						rgbcx::unpack_bc4(block_ptr, single, 1);
-						for (int i = 0; i < 16; ++i) {
-							block_pixels[i * 4 + 0] = single[i];
-							block_pixels[i * 4 + 1] = single[i];
-							block_pixels[i * 4 + 2] = single[i];
-							block_pixels[i * 4 + 3] = 255;
-						}
-                   } else if (out.format == DXGI_FORMAT_BC5_UNORM) {
-						// BC5 = two channels (usually normal maps), unpack into RG/GB and set A=255
-						rgbcx::unpack_bc5(block_ptr, block_pixels, 0, 1, 4);
-						for (int i = 0; i < 16; ++i) {
-							uint8_t r = block_pixels[i * 4 + 0];
-							uint8_t g = block_pixels[i * 4 + 1];
-							block_pixels[i * 4 + 2] = r; // replicate one channel for visible color
-							block_pixels[i * 4 + 3] = 255;
-						}
-					} else {
-						// Unsupported format
-						continue;
-					}
-
-                    for (int py = 0; py < 4; ++py) {
-						for (int px = 0; px < 4; ++px) {
-							int x = bx * 4 + px;
-							int y = by * 4 + py;
-							if (x >= width || y >= height) continue;
-							int dst = (y * width + x) * bytes_per_pixel;
-							int src = py * 4 + px;
-							pixels[dst + 0] = block_pixels[src * 4 + 0];
-							pixels[dst + 1] = block_pixels[src * 4 + 1];
-							pixels[dst + 2] = block_pixels[src * 4 + 2];
-							pixels[dst + 3] = block_pixels[src * 4 + 3];
-						}
-					}
-				}
-			}
-
-			SDL_Surface* surf =
-				SDL_CreateSurface(width, height, SDL_PIXELFORMAT_RGBA32);
-			if (!surf) {
-				SDL_Log("decodeEncodeOutputToSurface: SDL_CreateRGBSurfaceWithFormat failed: %s", SDL_GetError());
-				return nullptr;
-			}
-			// Copy pixels into surface
-			if (SDL_MUSTLOCK(surf)) SDL_LockSurface(surf);
-			memcpy(surf->pixels, pixels.data(), pixels.size());
-			if (SDL_MUSTLOCK(surf)) SDL_UnlockSurface(surf);
-			return surf;
-		}
-
 		// Decode raw compressed blocks (from any encoder) into an SDL_Surface for preview.
 		SDL_Surface* decodeBlocksToSurface(const void* blocks, int bytes_per_block, int num_blocks, int width, int height, int format) {
 			if (blocks == nullptr || num_blocks <= 0 || width <= 0 || height <= 0) return nullptr;
@@ -1340,7 +1131,7 @@ class Application {
 					for (int i = 0; i < 16; ++i) {
 						uint8_t r = block_pixels[i * 4 + 0];
 						uint8_t g = block_pixels[i * 4 + 1];
-						block_pixels[i * 4 + 2] = r;
+						block_pixels[i * 4 + 2] = 0;
 						block_pixels[i * 4 + 3] = 255;
 					}
 					} else {
@@ -1372,12 +1163,7 @@ class Application {
 			if (SDL_MUSTLOCK(surf)) SDL_LockSurface(surf);
 			memcpy(surf->pixels, pixels.data(), pixels.size());
 			if (SDL_MUSTLOCK(surf)) SDL_UnlockSurface(surf);
-            // Dump preview to BMP for quick debugging
-			if (SDL_SaveBMP(surf, "decoded_preview.bmp") == 0) {
-				SDL_Log("decodeBlocksToSurface: wrote preview to decoded_preview.bmp");
-			} else {
-				SDL_Log("decodeBlocksToSurface: failed to write preview BMP: %s", SDL_GetError());
-			}
+            
 			return surf;
 		}
 
