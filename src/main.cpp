@@ -7,21 +7,20 @@
 #include <SDL3_image/SDL_image.h>
 #include <backends/imgui_impl_sdl3.h>
 #include <backends/imgui_impl_sdlrenderer3.h>
+#include <bc7decomp.h>
 #include <imgui.h>
-#include <imgui_internal.h>
 #include <imgui_node_editor.h>
 #include <libbc7enc.h>
-#include <bc7decomp.h>
 #include <rgbcx.h>
 
+#include <algorithm>
 #include <array>
-#include <string>
-#include <vector>
 #include <fstream>
 #include <memory>
-#include <algorithm>
 #include <stack>
+#include <string>
 #include <unordered_set>
+#include <vector>
 
 namespace NodeImGui = ax::NodeEditor;
 
@@ -38,8 +37,7 @@ enum ApplicationStatus {
 constexpr std::array<SDL_DialogFileFilter, 3> dialog_filters = {
 	SDL_DialogFileFilter{"PNG images", "png"},
 	SDL_DialogFileFilter{"JPEG images", "jpg;jpeg"},
-	SDL_DialogFileFilter{"All images", "png;jpg;jpeg"}
-};
+	SDL_DialogFileFilter{"All images", "png;jpg;jpeg"}};
 
 std::vector<std::string> selected_files;  // Vector (aka C++ ArrayList) to store
 										  // the files selected by the user
@@ -83,7 +81,6 @@ static void SDLCALL callback(void* userdata, const char* const* filelist,
 	}
 }
 
-
 // Because RAII is pretty nice <3
 class Application {
    private:
@@ -92,16 +89,13 @@ class Application {
 	std::string window_title;
 	SDL_Window* window;
 	SDL_Renderer* renderer;
-	
 
 	class NodeEditor {
 		NodeImGui::EditorContext* nodeContext;
 
-		
 		int uniqueId = 1;
 
-	    public:
-
+	   public:
 		struct Link {
 			NodeImGui::LinkId id;
 			NodeImGui::PinId startPin;
@@ -109,17 +103,17 @@ class Application {
 		};
 
 		class Node {
-		  public:
+		   public:
 			NodeImGui::NodeId id;
 			ImVector<NodeImGui::PinId> inputs;
 			ImVector<NodeImGui::PinId> outputs;
 
-         SDL_Texture* texture = nullptr;
+			SDL_Texture* texture = nullptr;
 			// Uncompressed pixel surface associated with this node (if any).
 			SDL_Surface* surface = nullptr;
 			std::string sourceFile;
 			std::string outputFile;
-           // Compressed data produced by compression nodes (raw block data).
+			// Compressed data produced by compression nodes (raw block data).
 			std::vector<char> compressedBlocks;
 			int compressedWidth = 0;
 			int compressedHeight = 0;
@@ -131,24 +125,25 @@ class Application {
 
 			virtual ~Node() = default;
 
-			virtual const char* name() const { return "Node"; }
+			[[nodiscard]] virtual const char* name() const { return "Node"; }
 
 			virtual void renderBody(Application* app, NodeEditor& editor) {
 				// Default node has no custom UI.
 			}
 
-            // Process the node. The pipeline maintains an in-memory `currentSurface`
-			// that is passed by reference between nodes. Nodes may read and/or
-			// replace `currentSurface`. Compression nodes should populate
-			// `compressedBlocks` but may leave `currentSurface` intact for
-			// downstream preview/processing.
-			virtual bool process(NodeEditor& editor, SDL_Renderer* renderer, Node* inputNode, SDL_Surface*& currentSurface) {
+			// Process the node. The pipeline maintains an in-memory
+			// `currentSurface` that is passed by reference between nodes. Nodes
+			// may read and/or replace `currentSurface`. Compression nodes
+			// should populate `compressedBlocks` but may leave `currentSurface`
+			// intact for downstream preview/processing.
+			virtual bool process(NodeEditor& editor, SDL_Renderer* renderer,
+								 Node* inputNode,
+								 SDL_Surface*& currentSurface) {
 				return true;
 			}
-
 		};
 
-		//Structure that keeps track of a link's source and destination Node
+		// Structure that keeps track of a link's source and destination Node
 		struct GraphEdge {
 			Node* source;
 			Node* destination;
@@ -156,8 +151,11 @@ class Application {
 
 		class InputNode : public Node {
 			bool containsImage = false;
+
 		   public:
-			[[nodiscard]] const char* name() const override { return "Input Node"; }
+			[[nodiscard]] const char* name() const override {
+				return "Input Node";
+			}
 			InputNode() { this->containsImage = false; }
 
 			void renderBody(Application* app, NodeEditor& editor) override {
@@ -171,11 +169,12 @@ class Application {
 
 				if (!original_textures.empty() && !selected_files.empty() &&
 					containsImage) {
-                    if (ImGui::Button("Load")) {
+					if (ImGui::Button("Load")) {
 						texture = original_textures.back();
-						// Try to also load the underlying surface for in-memory processing
-						// IMG_Load returns an SDL_Surface*, but we previously loaded textures.
-						// Load a surface here from the path instead.
+						// Try to also load the underlying surface for in-memory
+						// processing IMG_Load returns an SDL_Surface*, but we
+						// previously loaded textures. Load a surface here from
+						// the path instead.
 						surface = IMG_Load(selected_files.back().c_str());
 
 						if (!surface) {
@@ -201,7 +200,7 @@ class Application {
 					const float scaleFactor = std::min(maxWidth, 1.0f);
 
 					const ImVec2 scaledSize(width * scaleFactor,
-									  height * scaleFactor);
+											height * scaleFactor);
 
 					ImGui::Image(texture, scaledSize);
 				}
@@ -209,20 +208,23 @@ class Application {
 		};
 
 		class OutputNode : public Node {
-		    bool containsImage = false;
+			bool containsImage = false;
 			std::vector<Node*> processingPath;
 			Node* inputNode = nullptr;
 			bool fallbackToDisk = false;
+
 		   public:
 			OutputNode() { this->containsImage = false; }
-			[[nodiscard]] const char* name() const override { return "Output Node"; }
+			[[nodiscard]] const char* name() const override {
+				return "Output Node";
+			}
 
 			void renderBody(Application* app, NodeEditor& editor) override {
+				if (ImGui::Button("Process chain")) {
+					processingPath =
+						editor.findPathBetweenInputAndOutput(this->id);
 
-				if (editor.findUpstreamNode(*this) != nullptr) {
-					if (ImGui::Button("Process chain")) {
-						processingPath = editor.findPathBetweenInputAndOutput(this->id);
-
+					if (!processingPath.empty()) {
 						inputNode = processingPath.front();
 						sourceFile = inputNode->sourceFile;
 
@@ -230,11 +232,12 @@ class Application {
 								processingPath.size());
 						SDL_Log("Input node: %s (ID: %lu)", inputNode->name(),
 								inputNode->id.Get());
-
 						editor.processPath(processingPath, app->renderer);
+					} else {
+						SDL_Log("No path found");
 					}
 				}
-			
+
 				if (!outputFile.empty()) {
 					ImGui::Text("Output: %s", outputFile.c_str());
 				}
@@ -249,21 +252,20 @@ class Application {
 					const float scaleFactor = std::min(maxWidth, 1.0f);
 
 					const ImVec2 scaledSize(width * scaleFactor,
-									  height * scaleFactor);
+											height * scaleFactor);
 
 					ImGui::Image(texture, scaledSize);
 					if (fallbackToDisk) {
-						ImGui::TextWrapped(
-							"Loaded from disk");
+						ImGui::TextWrapped("Loaded from disk");
 					}
 				}
 			}
 
-            bool process(NodeEditor& editor, SDL_Renderer* renderer,
+			bool process(NodeEditor& editor, SDL_Renderer* renderer,
 						 Node* previousNode,
 						 SDL_Surface*& currentSurface) override {
 				fallbackToDisk = false;
-				
+
 				if (previousNode == nullptr) {
 					SDL_Log("Output node has no upstream node.");
 					return false;
@@ -297,28 +299,37 @@ class Application {
 		   public:
 			int mipmapLevels = 1;
 
-			[[nodiscard]] const char* name() const override { return "MipMap Node"; }
+			[[nodiscard]] const char* name() const override {
+				return "MipMap Node";
+			}
 
-            bool process(NodeEditor& editor, SDL_Renderer* renderer, Node* inputNode, SDL_Surface*& currentSurface) override {
+			bool process(NodeEditor& editor, SDL_Renderer* renderer,
+						 Node* inputNode,
+						 SDL_Surface*& currentSurface) override {
 				return true;
 			}
 		};
 
 		class EffectNode : public Node {
 		   public:
-			[[nodiscard]] const char* name() const override { return "Effect Node"; }
+			[[nodiscard]] const char* name() const override {
+				return "Effect Node";
+			}
 
 			void renderBody(Application* app, NodeEditor& editor) override {
 				ImGui::Text("Effect node placeholder");
 			}
 
-            bool process(NodeEditor& editor, SDL_Renderer* renderer, Node* inputNode, SDL_Surface*& currentSurface) override {
+			bool process(NodeEditor& editor, SDL_Renderer* renderer,
+						 Node* inputNode,
+						 SDL_Surface*& currentSurface) override {
 				if (inputNode == nullptr) {
 					SDL_Log("Effect node has no input.");
 					return false;
 				}
 
-				if (!inputNode->process(editor, renderer, inputNode, currentSurface)) {
+				if (!inputNode->process(editor, renderer, inputNode,
+										currentSurface)) {
 					return false;
 				}
 
@@ -328,7 +339,8 @@ class Application {
 						SDL_DestroyTexture(texture);
 						texture = nullptr;
 					}
-					texture = SDL_CreateTextureFromSurface(renderer, currentSurface);
+					texture =
+						SDL_CreateTextureFromSurface(renderer, currentSurface);
 				} else if (inputNode->texture) {
 					texture = inputNode->texture;
 				}
@@ -340,58 +352,59 @@ class Application {
 			}
 		};
 
-
 		class CompressionNode : public Node {
 		   public:
 			enum class CompressionType { BC7, BC5, BC4, BC3, BC2, BC1 };
 
 			CompressionType compressionType = CompressionType::BC7;
 
-			[[nodiscard]] const char* name() const override { return "Compression Node"; }
+			[[nodiscard]] const char* name() const override {
+				return "Compression Node";
+			}
 
 			void renderBody(Application* app, NodeEditor& editor) override {
-			switch (compressionType) {
-				case CompressionType::BC7:
-					ImGui::Text("Compression: BC7");
-					break;
-				case CompressionType::BC5:
-					ImGui::Text("Compression: BC5");
-					break;
-				case CompressionType::BC4:
-					ImGui::Text("Compression: BC4");
-					break;
-				case CompressionType::BC3:
-					ImGui::Text("Compression: BC3");
-					break;
-				case CompressionType::BC2:
-					ImGui::Text("Compression: BC2");
-					break;
-				case CompressionType::BC1:
-					ImGui::Text("Compression: BC1");
-					break;
+				switch (compressionType) {
+					case CompressionType::BC7:
+						ImGui::Text("Compression: BC7");
+						break;
+					case CompressionType::BC5:
+						ImGui::Text("Compression: BC5");
+						break;
+					case CompressionType::BC4:
+						ImGui::Text("Compression: BC4");
+						break;
+					case CompressionType::BC3:
+						ImGui::Text("Compression: BC3");
+						break;
+					case CompressionType::BC2:
+						ImGui::Text("Compression: BC2");
+						break;
+					case CompressionType::BC1:
+						ImGui::Text("Compression: BC1");
+						break;
+				}
 			}
 
-			}
-
-            bool process(NodeEditor& editor, SDL_Renderer* renderer, Node* inputNode, SDL_Surface*& currentSurface) override {
-				
-                if (inputNode == nullptr) {
+			bool process(NodeEditor& editor, SDL_Renderer* renderer,
+						 Node* inputNode,
+						 SDL_Surface*& currentSurface) override {
+				if (inputNode == nullptr) {
 					SDL_Log("Compression node has no input.");
 					return false;
 				}
 
-                // If we have an in-memory surface from upstream, prefer that.
+				// If we have an in-memory surface from upstream, prefer that.
 				SDL_Surface* surfaceToCompress = currentSurface;
 				if (!surfaceToCompress && !inputNode->sourceFile.empty()) {
-					// Fall back to loading from disk if surface is not available.
+					// Fall back to loading from disk if surface is not
+					// available.
 					surfaceToCompress = IMG_Load(inputNode->sourceFile.c_str());
 					if (!surfaceToCompress) {
-						SDL_Log("Failed to load surface from %s: %s", inputNode->sourceFile.c_str(), SDL_GetError());
+						SDL_Log("Failed to load surface from %s: %s",
+								inputNode->sourceFile.c_str(), SDL_GetError());
 						return false;
 					}
 				}
-
-
 
 				// Choose an output filename. Prefer a descriptive name using
 				// the
@@ -439,9 +452,15 @@ class Application {
 
 				// Compress to blocks and store on this node.
 				std::vector<char> blocks;
-				int w = 0, h = 0, bytes_per_block = 0, num_blocks = 0, format = 0;
-				if (!editor.compressSurfaceToBlocks(surfaceToCompress, blocks, w, h, bytes_per_block, num_blocks, format, compressionType)) {
-					if (surfaceToCompress && surfaceToCompress != currentSurface) SDL_DestroySurface(surfaceToCompress);
+				int w = 0, h = 0, bytes_per_block = 0, num_blocks = 0,
+					format = 0;
+				if (!editor.compressSurfaceToBlocks(
+						surfaceToCompress, blocks, w, h, bytes_per_block,
+						num_blocks, format, compressionType)) {
+					if (surfaceToCompress &&
+						surfaceToCompress != currentSurface) {
+						SDL_DestroySurface(surfaceToCompress);
+					}
 					return false;
 				}
 
@@ -450,52 +469,59 @@ class Application {
 				this->compressedHeight = h;
 				this->compressedBytesPerBlock = bytes_per_block;
 				this->compressedNumBlocks = num_blocks;
-                this->compressedFormat = format;
+				this->compressedFormat = format;
 
 				if (!editor.writeBlockstoDDS(
 						this->compressedBlocks, this->compressedWidth,
 						this->compressedHeight, this->compressedBytesPerBlock,
 						this->compressedNumBlocks, this->compressedFormat,
-						outName)){
+						outName)) {
 					outputFile = outName;
-					SDL_Log("Compression node wrote DDS: %s", outputFile.c_str());
-				}else{
-				SDL_Log("Compression node failed to write DDS: %s",
-						outName.c_str());
-				outputFile = "";
-			}
-
-            // Try to decode compressed blocks for preview (prefer compressed preview).
-			SDL_Surface* decoded = nullptr;
-			if (!this->compressedBlocks.empty()) {
-				decoded = editor.decodeBlocksToSurface(this->compressedBlocks.data(), this->compressedBytesPerBlock, this->compressedNumBlocks, this->compressedWidth, this->compressedHeight, this->compressedFormat);
-			}
-			if (decoded) {
-				if (texture) {
-					SDL_DestroyTexture(texture);
-					texture = nullptr;
+					SDL_Log("Compression node wrote DDS: %s",
+							outputFile.c_str());
+				} else {
+					SDL_Log("Compression node failed to write DDS: %s",
+							outName.c_str());
+					outputFile = "";
 				}
 
-				texture = SDL_CreateTextureFromSurface(renderer, decoded);
+				// Try to decode compressed blocks for preview (prefer
+				// compressed preview).
+				SDL_Surface* decoded = nullptr;
+				if (!this->compressedBlocks.empty()) {
+					decoded = editor.decodeBlocksToSurface(
+						this->compressedBlocks.data(),
+						this->compressedBytesPerBlock,
+						this->compressedNumBlocks, this->compressedWidth,
+						this->compressedHeight, this->compressedFormat);
+				}
+				if (decoded) {
+					if (texture) {
+						SDL_DestroyTexture(texture);
+						texture = nullptr;
+					}
 
-				SDL_Surface* nextSurface = SDL_DuplicateSurface(decoded);
-				if (!nextSurface) {
-					SDL_Log("SDL_DuplicateSurface failed: %s", SDL_GetError());
+					texture = SDL_CreateTextureFromSurface(renderer, decoded);
+
+					SDL_Surface* nextSurface = SDL_DuplicateSurface(decoded);
+					if (!nextSurface) {
+						SDL_Log("SDL_DuplicateSurface failed: %s",
+								SDL_GetError());
+						SDL_DestroySurface(decoded);
+						return false;
+					}
+
+					if (currentSurface) {
+						SDL_DestroySurface(currentSurface);
+					}
+
+					currentSurface = nextSurface;
+
+					sourceFile = inputNode->sourceFile;
+					outputFile = outName;
+
 					SDL_DestroySurface(decoded);
-					return false;
 				}
-
-				if (currentSurface) {
-					SDL_DestroySurface(currentSurface);
-				}
-
-				currentSurface = nextSurface;
-
-				sourceFile = inputNode->sourceFile;
-				outputFile = outName;
-
-				SDL_DestroySurface(decoded);
-			}
 				return true;
 			}
 		};
@@ -509,7 +535,7 @@ class Application {
 		}
 
 		NodeEditor() {
-           // Initialize rgbcx decoder/encoder tables for BC1-5
+			// Initialize rgbcx decoder/encoder tables for BC1-5
 			rgbcx::init();
 
 			NodeImGui::Config config;
@@ -520,7 +546,6 @@ class Application {
 		std::vector<std::unique_ptr<Node>> nodes;
 		std::vector<Link> links;
 		std::vector<GraphEdge> graphEdges;
-
 
 		void addNode(std::unique_ptr<Node> node) {
 			nodes.push_back(std::move(node));
@@ -535,7 +560,8 @@ class Application {
 			return nullptr;
 		}
 
-		[[nodiscard]] Node* findNodeOwningPin(const NodeImGui::PinId pin) const {
+		[[nodiscard]] Node* findNodeOwningPin(
+			const NodeImGui::PinId pin) const {
 			for (const auto& node : nodes) {
 				if (node->inputs.contains(pin) || node->outputs.contains(pin)) {
 					return node.get();
@@ -545,31 +571,43 @@ class Application {
 		}
 
 		Node* findUpstreamNode(Node& targetNode) const {
-            if (targetNode.inputs.empty()) {
-				SDL_Log("findUpstreamNode: target node %lu has no inputs", targetNode.id.Get());
+			if (targetNode.inputs.empty()) {
+				SDL_Log("findUpstreamNode: target node %lu has no inputs",
+						targetNode.id.Get());
 				return nullptr;
 			}
 
-			SDL_Log("findUpstreamNode: target node %lu has %d input pins", targetNode.id.Get(), targetNode.inputs.size());
+			SDL_Log("findUpstreamNode: target node %lu has %d input pins",
+					targetNode.id.Get(), targetNode.inputs.size());
 
 			// Search all input pins for an incoming link.
 			for (const auto& targetInputPin : targetNode.inputs) {
-				SDL_Log("findUpstreamNode: checking inputPin %lu for node %lu", targetInputPin.Get(), targetNode.id.Get());
+				SDL_Log("findUpstreamNode: checking inputPin %lu for node %lu",
+						targetInputPin.Get(), targetNode.id.Get());
 				for (const auto& link : links) {
-					SDL_Log(" findUpstreamNode: link id=%lu start=%lu end=%lu", link.id.Get(), link.startPin.Get(), link.endPin.Get());
+					SDL_Log(" findUpstreamNode: link id=%lu start=%lu end=%lu",
+							link.id.Get(), link.startPin.Get(),
+							link.endPin.Get());
 					if (link.endPin == targetInputPin) {
 						Node* owner = findNodeOwningPin(link.startPin);
 						if (owner) {
-							SDL_Log("findUpstreamNode: found upstream node %lu via link %lu", owner->id.Get(), link.id.Get());
+							SDL_Log(
+								"findUpstreamNode: found upstream node %lu via "
+								"link %lu",
+								owner->id.Get(), link.id.Get());
 						} else {
-							SDL_Log("findUpstreamNode: found link %lu but owner not found for startPin %lu", link.id.Get(), link.startPin.Get());
+							SDL_Log(
+								"findUpstreamNode: found link %lu but owner "
+								"not found for startPin %lu",
+								link.id.Get(), link.startPin.Get());
 						}
 						return owner;
 					}
 				}
 			}
 
-			SDL_Log("findUpstreamNode: no upstream found for node %lu", targetNode.id.Get());
+			SDL_Log("findUpstreamNode: no upstream found for node %lu",
+					targetNode.id.Get());
 			return nullptr;
 		}
 
@@ -582,13 +620,13 @@ class Application {
 										 });
 
 			if (id != nodes.end()) {
-
-				graphEdges.erase(std::remove_if(graphEdges.begin(), graphEdges.end(),
-									   [id](const auto& edge) {
-										   return edge.source == id->get() ||
-												  edge.destination == id->get();
-									   }),
-									graphEdges.end());
+				graphEdges.erase(
+					std::remove_if(graphEdges.begin(), graphEdges.end(),
+								   [id](const auto& edge) {
+									   return edge.source == id->get() ||
+											  edge.destination == id->get();
+								   }),
+					graphEdges.end());
 				nodes.erase(id);
 			}
 		}
@@ -598,18 +636,23 @@ class Application {
 				links.begin(), links.end(),
 				[linkToDelete](auto& link) { return link.id == linkToDelete; });
 			if (id != links.end()) {
-				graphEdges.erase(std::remove_if(graphEdges.begin(), graphEdges.end(),
-									   [id](const auto& edge) {
-										   return (edge.source->inputs.contains(id->startPin) ||
-												   edge.source->outputs.contains(id->startPin)) &&
-												  (edge.destination->inputs.contains(id->endPin) ||
-												   edge.destination->outputs.contains(id->endPin));
-									   }),
-				graphEdges.end());
+				graphEdges.erase(
+					std::remove_if(
+						graphEdges.begin(), graphEdges.end(),
+						[id](const auto& edge) {
+							return (edge.source->inputs.contains(
+										id->startPin) ||
+									edge.source->outputs.contains(
+										id->startPin)) &&
+								   (edge.destination->inputs.contains(
+										id->endPin) ||
+									edge.destination->outputs.contains(
+										id->endPin));
+						}),
+					graphEdges.end());
 				links.erase(id);
 			}
 		}
-
 
 		// Compress an in-memory SDL_Surface to a DDS file using the specified
 		// compression type. Useful when the pipeline keeps data in-memory
@@ -617,36 +660,40 @@ class Application {
 
 		// Compress an in-memory SDL_Surface into raw compressed blocks and
 		// metadata. Returns true on success and fills `outBlocks` and metadata.
-		bool compressSurfaceToBlocks(SDL_Surface* inputSurface,
-				 std::vector<char>& outBlocks,
-				 int& outWidth,
-				 int& outHeight,
-				 int& outBytesPerBlock,
-				 int& outNumBlocks,
-				 int& outFormat,
-				 CompressionNode::CompressionType compressionType) {
-			SDL_Log("compressSurfaceToBlocks: starting compression for type %d", static_cast<int>(compressionType));
+		bool compressSurfaceToBlocks(
+			SDL_Surface* inputSurface, std::vector<char>& outBlocks,
+			int& outWidth, int& outHeight, int& outBytesPerBlock,
+			int& outNumBlocks, int& outFormat,
+			CompressionNode::CompressionType compressionType) {
+			SDL_Log("compressSurfaceToBlocks: starting compression for type %d",
+					static_cast<int>(compressionType));
 			if (inputSurface == nullptr) {
 				SDL_Log("compressSurfaceToBlocks: inputSurface is null");
 				return false;
 			}
 
-			SDL_Surface* surface = SDL_ConvertSurface(inputSurface, SDL_PIXELFORMAT_RGBA32);
+			SDL_Surface* surface =
+				SDL_ConvertSurface(inputSurface, SDL_PIXELFORMAT_RGBA32);
 			if (surface == nullptr) {
 				SDL_Log("SDL_ConvertSurface failed: %s", SDL_GetError());
 				return false;
 			}
 
-          // If BC7, use existing encoder (libbc7enc). For BC1/3/4/5 use rgbcx block encoder.
+			// If BC7, use existing encoder (libbc7enc). For BC1/3/4/5 use rgbcx
+			// block encoder.
 			if (compressionType == CompressionNode::CompressionType::BC7) {
 				encode_output output = {};
 				rdo_bc::rdo_bc_params params = {};
 
 				params.m_dxgi_format = DXGI_FORMAT_BC7_UNORM;
-				bc7enc_compress_image_from_memory(surface->w, surface->h, surface->pixels, params, &output);
+				bc7enc_compress_image_from_memory(
+					surface->w, surface->h, surface->pixels, params, &output);
 
-				if (output.blocks && output.num_blocks > 0 && output.bytes_per_block > 0) {
-					const size_t totalBytes = static_cast<size_t>(output.num_blocks) * static_cast<size_t>(output.bytes_per_block);
+				if (output.blocks && output.num_blocks > 0 &&
+					output.bytes_per_block > 0) {
+					const size_t totalBytes =
+						static_cast<size_t>(output.num_blocks) *
+						static_cast<size_t>(output.bytes_per_block);
 					outBlocks.assign(output.blocks, output.blocks + totalBytes);
 					outWidth = output.width;
 					outHeight = output.height;
@@ -654,7 +701,8 @@ class Application {
 					outNumBlocks = output.num_blocks;
 					outFormat = static_cast<int>(output.format);
 				} else {
-					SDL_Log("compressSurfaceToBlocks: encoder produced no blocks");
+					SDL_Log(
+						"compressSurfaceToBlocks: encoder produced no blocks");
 					bc7enc_free_encode_output(&output);
 					SDL_DestroySurface(surface);
 					return false;
@@ -674,29 +722,48 @@ class Application {
 				int dxgi_format = 0;
 
 				switch (compressionType) {
-					case CompressionNode::CompressionType::BC1: bytes_per_block = 8; dxgi_format = DXGI_FORMAT_BC1_UNORM; break;
-					case CompressionNode::CompressionType::BC3: bytes_per_block = 16; dxgi_format = DXGI_FORMAT_BC3_UNORM; break;
-					case CompressionNode::CompressionType::BC4: bytes_per_block = 8; dxgi_format = DXGI_FORMAT_BC4_UNORM; break;
-					case CompressionNode::CompressionType::BC5: bytes_per_block = 16; dxgi_format = DXGI_FORMAT_BC5_UNORM; break;
-					
-					default: SDL_DestroySurface(surface); return false;
+					case CompressionNode::CompressionType::BC1:
+						bytes_per_block = 8;
+						dxgi_format = DXGI_FORMAT_BC1_UNORM;
+						break;
+					case CompressionNode::CompressionType::BC3:
+						bytes_per_block = 16;
+						dxgi_format = DXGI_FORMAT_BC3_UNORM;
+						break;
+					case CompressionNode::CompressionType::BC4:
+						bytes_per_block = 8;
+						dxgi_format = DXGI_FORMAT_BC4_UNORM;
+						break;
+					case CompressionNode::CompressionType::BC5:
+						bytes_per_block = 16;
+						dxgi_format = DXGI_FORMAT_BC5_UNORM;
+						break;
+
+					default:
+						SDL_DestroySurface(surface);
+						return false;
 				}
 
-				outBlocks.resize(static_cast<size_t>(num_blocks) * bytes_per_block);
+				outBlocks.resize(static_cast<size_t>(num_blocks) *
+								 bytes_per_block);
 
 				// temporary block pixel buffer (RGBA)
 				uint8_t block_pixels[16 * 4];
 
 				for (int by = 0; by < blocks_y; ++by) {
 					for (int bx = 0; bx < blocks_x; ++bx) {
-						// fill block_pixels from surface, pad with zeros for out-of-range pixels
+						// fill block_pixels from surface, pad with zeros for
+						// out-of-range pixels
 						for (int py = 0; py < 4; ++py) {
 							for (int px = 0; px < 4; ++px) {
 								const int x = bx * 4 + px;
 								const int y = by * 4 + py;
 								const int idx = (py * 4 + px) * 4;
 								if (x < width && y < height) {
-									const uint8_t* src = reinterpret_cast<uint8_t*>(surface->pixels) + (y * surface->pitch) + (x * 4);
+									const uint8_t* src =
+										reinterpret_cast<uint8_t*>(
+											surface->pixels) +
+										(y * surface->pitch) + (x * 4);
 									block_pixels[idx + 0] = src[0];
 									block_pixels[idx + 1] = src[1];
 									block_pixels[idx + 2] = src[2];
@@ -710,11 +777,15 @@ class Application {
 							}
 						}
 
-						void* dst = outBlocks.data() + (static_cast<size_t>(by * blocks_x + bx) * bytes_per_block);
-                        switch (compressionType) {
-							// Use low quality / fast mode for interactive debugging.
+						void* dst = outBlocks.data() +
+									(static_cast<size_t>(by * blocks_x + bx) *
+									 bytes_per_block);
+						switch (compressionType) {
+							// Use low quality / fast mode for interactive
+							// debugging.
 							case CompressionNode::CompressionType::BC1:
-								rgbcx::encode_bc1(0, dst, block_pixels, false, false);
+								rgbcx::encode_bc1(0, dst, block_pixels, false,
+												  false);
 								break;
 							case CompressionNode::CompressionType::BC3:
 								rgbcx::encode_bc3(0, dst, block_pixels);
@@ -726,10 +797,12 @@ class Application {
 								rgbcx::encode_bc5(dst, block_pixels, 0, 1, 4);
 								break;
 							case CompressionNode::CompressionType::BC2:
-								rgbcx::encode_bc3(10, dst, block_pixels); // approx BC2 with BC3
+								rgbcx::encode_bc3(
+									10, dst,
+									block_pixels);	// approx BC2 with BC3
 								break;
 							default:
-                        		break;
+								break;
 						}
 					}
 				}
@@ -745,18 +818,17 @@ class Application {
 			}
 		}
 
-		bool writeBlockstoDDS(std::vector<char> blocks,
-								  int w, int h, int bytes_per_block,
-								  int num_blocks, int format, const std::string& outputFile) {
-
+		bool writeBlockstoDDS(std::vector<char> blocks, int w, int h,
+							  int bytes_per_block, int num_blocks, int format,
+							  const std::string& outputFile) {
 			size_t totalBytes = blocks.size();
 			if (totalBytes == 0) {
 				SDL_Log("compressBlockstoDDS: no compressed data to write");
 				return false;
 			}
 
-			// Write DDS with DX10 header so modern tools correctly interpret the
-			// DXGI format and resource dimension.
+			// Write DDS with DX10 header so modern tools correctly interpret
+			// the DXGI format and resource dimension.
 			struct DDS_PIXELFORMAT {
 				uint32_t dwSize;
 				uint32_t dwFlags;
@@ -804,7 +876,8 @@ class Application {
 
 			DDS_HEADER header{};
 			header.dwSize = 124;
-			header.dwFlags = DDSD_CAPS | DDSD_HEIGHT | DDSD_WIDTH | DDSD_PIXELFORMAT | DDSD_LINEARSIZE;
+			header.dwFlags = DDSD_CAPS | DDSD_HEIGHT | DDSD_WIDTH |
+							 DDSD_PIXELFORMAT | DDSD_LINEARSIZE;
 			header.dwHeight = static_cast<uint32_t>(h);
 			header.dwWidth = static_cast<uint32_t>(w);
 			header.dwPitchOrLinearSize = static_cast<uint32_t>(totalBytes);
@@ -814,7 +887,8 @@ class Application {
 			header.ddspf.dwSize = 32;
 			header.ddspf.dwFlags = DDPF_FOURCC;
 			// FourCC 'DX10' signals presence of DDS_HEADER_DX10
-			header.ddspf.dwFourCC = (uint32_t)('D' | ('X' << 8) | ('1' << 16) | ('0' << 24));
+			header.ddspf.dwFourCC =
+				(uint32_t)('D' | ('X' << 8) | ('1' << 16) | ('0' << 24));
 			header.ddspf.dwRGBBitCount = 0;
 			header.ddspf.dwRBitMask = 0;
 			header.ddspf.dwGBitMask = 0;
@@ -828,14 +902,15 @@ class Application {
 
 			DDS_HEADER_DX10 dx10{};
 			dx10.dxgiFormat = static_cast<uint32_t>(format);
-			dx10.resourceDimension = 3; // D3D10_RESOURCE_DIMENSION_TEXTURE2D
+			dx10.resourceDimension = 3;	 // D3D10_RESOURCE_DIMENSION_TEXTURE2D
 			dx10.miscFlag = 0;
 			dx10.arraySize = 1;
 			dx10.miscFlags2 = 0;
 
 			std::ofstream ofs(outputFile, std::ios::binary);
 			if (!ofs) {
-				SDL_Log("compressBlockstoDDS: failed to open output file: %s", outputFile.c_str());
+				SDL_Log("compressBlockstoDDS: failed to open output file: %s",
+						outputFile.c_str());
 				return false;
 			}
 
@@ -849,7 +924,8 @@ class Application {
 			ofs.write(blocks.data(), static_cast<std::streamsize>(totalBytes));
 			ofs.close();
 
-			SDL_Log("compressBlockstoDDS: wrote %zu bytes to %s", totalBytes, outputFile.c_str());
+			SDL_Log("compressBlockstoDDS: wrote %zu bytes to %s", totalBytes,
+					outputFile.c_str());
 			return true;
 		}
 
@@ -859,33 +935,32 @@ class Application {
 			NodeImGui::SetCurrentEditor(nodeContext);
 			NodeImGui::Begin("Node Editor");
 
-
 			for (const auto& node : nodes) {
 				NodeImGui::BeginNode(node->id);
 
-			// Push a unique ImGui ID per node to avoid "SameID" collisions
-			// for widgets (buttons, etc.) inside different nodes.
-			ImGui::PushID(static_cast<int>(node->id.Get()));
+				// Push a unique ImGui ID per node to avoid "SameID" collisions
+				// for widgets (buttons, etc.) inside different nodes.
+				ImGui::PushID(static_cast<int>(node->id.Get()));
 
-			ImGui::Text("%s - ID: %lu", node->name(), node->id.Get());
+				ImGui::Text("%s - ID: %lu", node->name(), node->id.Get());
 
-			for (const auto& inputPin : node->inputs) {
-				NodeImGui::BeginPin(inputPin, NodeImGui::PinKind::Input);
-				ImGui::Text("-> In");
-				NodeImGui::EndPin();
-			}
+				for (const auto& inputPin : node->inputs) {
+					NodeImGui::BeginPin(inputPin, NodeImGui::PinKind::Input);
+					ImGui::Text("-> In");
+					NodeImGui::EndPin();
+				}
 
-			node->renderBody(a, *this);
+				node->renderBody(a, *this);
 
-			for (const auto& outputPin : node->outputs) {
-				NodeImGui::BeginPin(outputPin, NodeImGui::PinKind::Output);
-				ImGui::Text("Out ->");
-				NodeImGui::EndPin();
-			}
+				for (const auto& outputPin : node->outputs) {
+					NodeImGui::BeginPin(outputPin, NodeImGui::PinKind::Output);
+					ImGui::Text("Out ->");
+					NodeImGui::EndPin();
+				}
 
-			ImGui::PopID();
+				ImGui::PopID();
 
-			NodeImGui::EndNode();
+				NodeImGui::EndNode();
 			}
 
 			for (const auto& link : links) {
@@ -893,7 +968,6 @@ class Application {
 				Node* sourceNode = findNodeOwningPin(link.startPin);
 				Node* destNode = findNodeOwningPin(link.endPin);
 				GraphEdge edge{sourceNode, destNode};
-				
 			}
 
 			if (NodeImGui::BeginCreate()) {
@@ -929,7 +1003,9 @@ class Application {
 								graphEdges.push_back(edge);
 								links.push_back(link);
 
-                    SDL_Log("Created link id=%lu start=%lu end=%lu", link.id.Get(), link.startPin.Get(), link.endPin.Get());
+								SDL_Log("Created link id=%lu start=%lu end=%lu",
+										link.id.Get(), link.startPin.Get(),
+										link.endPin.Get());
 							} else if (firstIsInput && secondIsOutput) {
 								link.startPin = secondPin;
 								link.endPin = firstPin;
@@ -939,7 +1015,9 @@ class Application {
 								edge.destination = firstNode;
 								graphEdges.push_back(edge);
 								links.push_back(link);
-                   SDL_Log("Created link id=%lu start=%lu end=%lu", link.id.Get(), link.startPin.Get(), link.endPin.Get());
+								SDL_Log("Created link id=%lu start=%lu end=%lu",
+										link.id.Get(), link.startPin.Get(),
+										link.endPin.Get());
 							}
 						}
 					}
@@ -1018,7 +1096,8 @@ class Application {
 		// For each node in the path (skipping the input node) set its
 		// `sourceFile` to the current file, call its `process` method and
 		// advance the current file to the node's `outputFile` if it was set.
-        bool processPath(const std::vector<Node*>& path, SDL_Renderer* renderer) {
+		bool processPath(const std::vector<Node*>& path,
+						 SDL_Renderer* renderer) {
 			if (path.empty()) {
 				SDL_Log("processPath: empty path");
 				return false;
@@ -1031,7 +1110,8 @@ class Application {
 				return false;
 			}
 
-			// Initialize currentSurface from the input node if available, otherwise try to load from disk.
+			// Initialize currentSurface from the input node if available,
+			// otherwise try to load from disk.
 			SDL_Surface* currentSurface = nullptr;
 
 			if (inputNode->surface) {
@@ -1040,7 +1120,8 @@ class Application {
 				currentSurface = IMG_Load(inputNode->sourceFile.c_str());
 			}
 
-			// Iterate nodes after the input node and feed the currentSurface through
+			// Iterate nodes after the input node and feed the currentSurface
+			// through
 			for (size_t i = 1; i < path.size(); ++i) {
 				Node* node = path[i];
 				if (node == nullptr) {
@@ -1048,9 +1129,13 @@ class Application {
 					if (currentSurface) SDL_DestroySurface(currentSurface);
 					return false;
 				}
-				SDL_Log("processPath: running %s (ID: %lu)", (node->name()), node->id.Get());
-				if (!node->process(*this, renderer, path[i - 1], currentSurface)) {
-					SDL_Log("processPath: node processing failed for %s (ID: %lu)", (node->name()), node->id.Get());
+				SDL_Log("processPath: running %s (ID: %lu)", node->name(),
+						node->id.Get());
+				if (!node->process(*this, renderer, path[i - 1],
+								   currentSurface)) {
+					SDL_Log(
+						"processPath: node processing failed for %s (ID: %lu)",
+						node->name(), node->id.Get());
 					if (currentSurface) SDL_DestroySurface(currentSurface);
 					return false;
 				}
@@ -1065,16 +1150,21 @@ class Application {
 			return true;
 		}
 
-		// Decode raw compressed blocks (from any encoder) into an SDL_Surface for preview.
+		// Decode raw compressed blocks (from any encoder) into an SDL_Surface
+		// for preview.
 		SDL_Surface* decodeBlocksToSurface(const void* blocks,
 										   const int bytes_per_block,
 										   const int num_blocks,
 										   const int width, const int height,
 										   const int format) {
-			if (blocks == nullptr || num_blocks <= 0 || width <= 0 || height <= 0) return nullptr;
+			if (blocks == nullptr || num_blocks <= 0 || width <= 0 ||
+				height <= 0)
+				return nullptr;
 
 			constexpr int bytes_per_pixel = 4;
-			std::vector<uint8_t> pixels(static_cast<size_t>(width) * static_cast<size_t>(height) * bytes_per_pixel);
+			std::vector<uint8_t> pixels(static_cast<size_t>(width) *
+										static_cast<size_t>(height) *
+										bytes_per_pixel);
 
 			const int blocks_x = (width + 3) / 4;
 			const int blocks_y = (height + 3) / 4;
@@ -1084,7 +1174,10 @@ class Application {
 				for (int bx = 0; bx < blocks_x; ++bx) {
 					const int block_index = by * blocks_x + bx;
 					if (block_index >= num_blocks) break;
-					const uint8_t* block_ptr = reinterpret_cast<const uint8_t*>(blocks) + static_cast<size_t>(block_index) * static_cast<size_t>(bytes_per_block);
+					const uint8_t* block_ptr =
+						reinterpret_cast<const uint8_t*>(blocks) +
+						static_cast<size_t>(block_index) *
+							static_cast<size_t>(bytes_per_block);
 					uint8_t block_pixels[16 * 4];
 					memset(block_pixels, 0, sizeof(block_pixels));
 
@@ -1097,12 +1190,12 @@ class Application {
 							block_pixels[i * 4 + 2] = out_colors[i].b;
 							block_pixels[i * 4 + 3] = out_colors[i].a;
 						}
-                   } else if (format == DXGI_FORMAT_BC1_UNORM) {
+					} else if (format == DXGI_FORMAT_BC1_UNORM) {
 						rgbcx::unpack_bc1(block_ptr, block_pixels, true,
 										  rgbcx::bc1_approx_mode::cBC1Ideal);
-						
+
 					} else if (format == DXGI_FORMAT_BC3_UNORM) {
-					   rgbcx::unpack_bc3(block_ptr, block_pixels);
+						rgbcx::unpack_bc3(block_ptr, block_pixels);
 					} else if (format == DXGI_FORMAT_BC4_UNORM) {
 						uint8_t single[16];
 						rgbcx::unpack_bc4(block_ptr, single, 1);
@@ -1112,19 +1205,22 @@ class Application {
 							block_pixels[i * 4 + 2] = single[i];
 							block_pixels[i * 4 + 3] = 255;
 						}
-               } else if (format == DXGI_FORMAT_BC5_UNORM) {
-					// rgbcx::unpack_bc5 has a void return type; it fills
-					// `block_pixels` directly.
-					rgbcx::unpack_bc5(block_ptr, block_pixels, 0, 1, 4);
-					for (int i = 0; i < 16; ++i) {
-						uint8_t r = block_pixels[i * 4 + 0];
-						uint8_t g = block_pixels[i * 4 + 1];
-						block_pixels[i * 4 + 2] = 0;
-						block_pixels[i * 4 + 3] = 255;
-					}
+					} else if (format == DXGI_FORMAT_BC5_UNORM) {
+						// rgbcx::unpack_bc5 has a void return type; it fills
+						// `block_pixels` directly.
+						rgbcx::unpack_bc5(block_ptr, block_pixels, 0, 1, 4);
+						for (int i = 0; i < 16; ++i) {
+							uint8_t r = block_pixels[i * 4 + 0];
+							uint8_t g = block_pixels[i * 4 + 1];
+							block_pixels[i * 4 + 2] = 0;
+							block_pixels[i * 4 + 3] = 255;
+						}
 					} else {
-                   SDL_Log("decodeBlocksToSurface: unsupported format %d for block %d", format, block_index);
-					continue;
+						SDL_Log(
+							"decodeBlocksToSurface: unsupported format %d for "
+							"block %d",
+							format, block_index);
+						continue;
 					}
 
 					for (int py = 0; py < 4; ++py) {
@@ -1143,15 +1239,19 @@ class Application {
 				}
 			}
 
-			SDL_Surface* surf = SDL_CreateSurface(width, height, SDL_PIXELFORMAT_RGBA32);
+			SDL_Surface* surf =
+				SDL_CreateSurface(width, height, SDL_PIXELFORMAT_RGBA32);
 			if (!surf) {
-				SDL_Log("decodeBlocksToSurface: SDL_CreateRGBSurfaceWithFormat failed: %s", SDL_GetError());
+				SDL_Log(
+					"decodeBlocksToSurface: SDL_CreateRGBSurfaceWithFormat "
+					"failed: %s",
+					SDL_GetError());
 				return nullptr;
 			}
 			if (SDL_MUSTLOCK(surf)) SDL_LockSurface(surf);
 			memcpy(surf->pixels, pixels.data(), pixels.size());
 			if (SDL_MUSTLOCK(surf)) SDL_UnlockSurface(surf);
-            
+
 			return surf;
 		}
 	};
@@ -1215,7 +1315,7 @@ class Application {
 	*/
 	[[nodiscard]] ApplicationStatus get_status() const { return status; }
 
-    private:
+   private:
 	// Function to create a node with 2 input pins and 2 outputs, has no
 	// specific type, just a generic node for testing
 	void CreateNode() {
@@ -1314,8 +1414,7 @@ class Application {
 								   ImGuiWindowFlags_AlwaysAutoResize)) {
 			ImGui::Text(
 				"The node graph and all related settings will be reset.\nThis "
-				"operation "
-				"cannot be undone.");
+				"operation cannot be undone.");
 			ImGui::Separator();
 			static bool dont_ask_me_next_time = false;
 			ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
@@ -1389,7 +1488,7 @@ class Application {
 			ImGui::BeginChild("ChildR", ImVec2(0, 160));
 			if (ImGui::BeginTable("Effects' table", 1)) {
 				ImGui::TableNextColumn();
-				//Placeholder-buttons
+				// Placeholder-buttons
 				if (ImGui::Button("2D Convolution")) {
 				}
 
@@ -1474,7 +1573,8 @@ class Application {
 				ImGui::TableNextColumn();
 
 				if (ImGui::Button("Create BC7 Compression Node")) {
-					CreateCompressionNode(NodeEditor::CompressionNode::CompressionType::BC7);
+					CreateCompressionNode(
+						NodeEditor::CompressionNode::CompressionType::BC7);
 				}
 				if (ImGui::Button("BC6S")) {
 				}
@@ -1502,7 +1602,6 @@ class Application {
 				}
 
 				if (ImGui::Button("Create BC1 Compression Node")) {
-
 					CreateCompressionNode(
 						NodeEditor::CompressionNode::CompressionType::BC1);
 				}
@@ -1534,8 +1633,8 @@ class Application {
 			}
 			ImGui::SameLine();
 			HelpMarker(
-				"Converts the image to a tangent-space normal map: exports "
-				"the normal vector (x y z) as the color (0.5*x + 0.5, "
+				"Converts the image to a tangent-space normal map: exports"
+				" the normal vector (x y z) as the color (0.5*x + 0.5, "
 				"0.5*y + 0.5 , 0.5*z + 0.5)");
 			if (ImGui::Button("Normal Map: Object Space")) {
 			}
@@ -1588,7 +1687,8 @@ class Application {
 
 			if (ImGui::BeginMenu("Help")) {
 				if (ImGui::MenuItem("GitHub")) {
-					SDL_OpenURL("https://github.com/MuhammedReza07/dd1367-project");
+					SDL_OpenURL(
+						"https://github.com/MuhammedReza07/dd1367-project");
 				}
 				ImGui::EndMenu();
 			}
@@ -1695,7 +1795,7 @@ class Application {
 			// ------ individual window features code here
 
 			// Show demo window.
-			//ImGui::ShowDemoWindow();
+			// ImGui::ShowDemoWindow();
 
 			// Render the ImGui frame.
 			ImGui::Render();
