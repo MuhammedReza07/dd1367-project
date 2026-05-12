@@ -229,22 +229,22 @@ class Application {
 
 			void renderBody(Application* app, NodeEditor& editor) override {
 
+				if (editor.findUpstreamNode(*this) != nullptr) {
 					if (ImGui::Button("Process chain")) {
-
 						processingPath = editor.findPathBetweenInputAndOutput(this->id);
+
 						inputNode = processingPath.front();
 						sourceFile = inputNode->sourceFile;
 
 						SDL_Log("Found path with %d nodes:",
-									(int)processingPath.size());
-						SDL_Log("Input node: %s (ID: %d)",
-								inputNode->name(),
+								(int)processingPath.size());
+						SDL_Log("Input node: %s (ID: %d)", inputNode->name(),
 								(int)inputNode->id.Get());
 
-						editor.processPath(processingPath, app->renderer);	
-						
+						editor.processPath(processingPath, app->renderer);
 					}
-
+				}
+			
 				if (!outputFile.empty()) {
 					ImGui::Text("Output: %s", outputFile.c_str());
 				}
