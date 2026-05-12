@@ -22,7 +22,6 @@
 #include <algorithm>
 #include <stack>
 #include <unordered_set>
-#include <queue>
 
 namespace NodeImGui = ax::NodeEditor;
 
@@ -36,23 +35,16 @@ enum ApplicationStatus {
 };
 
 // File dialog filters.
-constexpr std::array<SDL_DialogFileFilter, 4> dialog_filters = {
+constexpr std::array<SDL_DialogFileFilter, 3> dialog_filters = {
 	SDL_DialogFileFilter{"PNG images", "png"},
 	SDL_DialogFileFilter{"JPEG images", "jpg;jpeg"},
-	SDL_DialogFileFilter{"All images", "png;jpg;jpeg"},
-	SDL_DialogFileFilter{
-		"TXT files",
-		"txt"},	 // TXT-files are nice for debugging, let them stay for now
+	SDL_DialogFileFilter{"All images", "png;jpg;jpeg"}
 };
 
 std::vector<std::string> selected_files;  // Vector (aka C++ ArrayList) to store
 										  // the files selected by the user
 // Store unprocessed textures
 std::vector<SDL_Texture*> original_textures;
-// Store original loaded surfaces for in-memory processing
-std::vector<SDL_Surface*> original_surfaces;
-// Store post-processed textures
-std::vector<SDL_Texture*> manipulated_textures;
 
 // Callback function used to bring up file explorer dialog
 static void SDLCALL callback(void* userdata, const char* const* filelist,
@@ -165,7 +157,7 @@ class Application {
 		class InputNode : public Node {
 			bool containsImage = false;
 		   public:
-			const char* name() const override { return "Input Node"; }
+			[[nodiscard]] const char* name() const override { return "Input Node"; }
 			InputNode() { this->containsImage = false; }
 
 			void renderBody(Application* app, NodeEditor& editor) override {
@@ -202,15 +194,13 @@ class Application {
 				if (texture != nullptr) {
 					float width, height;
 					SDL_GetTextureSize(texture, &width, &height);
-					
-					
-					float maxWidth =
+
+					const float maxWidth =
 						1000.0f / width;  // Scale down if texture is wider than
 										  // 1000 pixels
-					float scaleFactor = std::min(maxWidth, 1.0f);
-					
+					const float scaleFactor = std::min(maxWidth, 1.0f);
 
-					ImVec2 scaledSize(width * scaleFactor,
+					const ImVec2 scaledSize(width * scaleFactor,
 									  height * scaleFactor);
 
 					ImGui::Image(texture, scaledSize);
@@ -225,7 +215,7 @@ class Application {
 			bool fallbackToDisk = false;
 		   public:
 			OutputNode() { this->containsImage = false; }
-			const char* name() const override { return "Output Node"; }
+			[[nodiscard]] const char* name() const override { return "Output Node"; }
 
 			void renderBody(Application* app, NodeEditor& editor) override {
 
@@ -236,10 +226,10 @@ class Application {
 						inputNode = processingPath.front();
 						sourceFile = inputNode->sourceFile;
 
-						SDL_Log("Found path with %d nodes:",
-								(int)processingPath.size());
-						SDL_Log("Input node: %s (ID: %d)", inputNode->name(),
-								(int)inputNode->id.Get());
+						SDL_Log("Found path with %lu nodes:",
+								processingPath.size());
+						SDL_Log("Input node: %s (ID: %lu)", inputNode->name(),
+								inputNode->id.Get());
 
 						editor.processPath(processingPath, app->renderer);
 					}
@@ -253,12 +243,12 @@ class Application {
 					float width, height;
 					SDL_GetTextureSize(texture, &width, &height);
 
-					float maxWidth =
+					const float maxWidth =
 						1000.0f / width;  // Scale down if texture is wider than
 										  // 1000 pixels
-					float scaleFactor = std::min(maxWidth, 1.0f);
+					const float scaleFactor = std::min(maxWidth, 1.0f);
 
-					ImVec2 scaledSize(width * scaleFactor,
+					const ImVec2 scaledSize(width * scaleFactor,
 									  height * scaleFactor);
 
 					ImGui::Image(texture, scaledSize);
@@ -307,7 +297,7 @@ class Application {
 		   public:
 			int mipmapLevels = 1;
 
-			const char* name() const override { return "MipMap Node"; }
+			[[nodiscard]] const char* name() const override { return "MipMap Node"; }
 
             bool process(NodeEditor& editor, SDL_Renderer* renderer, Node* inputNode, SDL_Surface*& currentSurface) override {
 				return true;
@@ -316,7 +306,7 @@ class Application {
 
 		class EffectNode : public Node {
 		   public:
-			const char* name() const override { return "Effect Node"; }
+			[[nodiscard]] const char* name() const override { return "Effect Node"; }
 
 			void renderBody(Application* app, NodeEditor& editor) override {
 				ImGui::Text("Effect node placeholder");
@@ -357,7 +347,7 @@ class Application {
 
 			CompressionType compressionType = CompressionType::BC7;
 
-			const char* name() const override { return "Compression Node"; }
+			[[nodiscard]] const char* name() const override { return "Compression Node"; }
 
 			void renderBody(Application* app, NodeEditor& editor) override {
 			switch (compressionType) {
@@ -506,12 +496,9 @@ class Application {
 
 				SDL_DestroySurface(decoded);
 			}
-				
-
 				return true;
 			}
 		};
-
 
 		NodeImGui::NodeId getUniqueId() {
 			return NodeImGui::NodeId(uniqueId++);
@@ -539,8 +526,8 @@ class Application {
 			nodes.push_back(std::move(node));
 		}
 
-		Node* findNodeById(NodeImGui::NodeId id) {
-			for (auto& node : nodes) {
+		[[nodiscard]] Node* findNodeById(const NodeImGui::NodeId id) const {
+			for (const auto& node : nodes) {
 				if (node->id == id) {
 					return node.get();
 				}
@@ -548,8 +535,8 @@ class Application {
 			return nullptr;
 		}
 
-		Node* findNodeOwningPin(NodeImGui::PinId pin) {
-			for (auto& node : nodes) {
+		[[nodiscard]] Node* findNodeOwningPin(const NodeImGui::PinId pin) const {
+			for (const auto& node : nodes) {
 				if (node->inputs.contains(pin) || node->outputs.contains(pin)) {
 					return node.get();
 				}
@@ -557,32 +544,32 @@ class Application {
 			return nullptr;
 		}
 
-		Node* findUpstreamNode(Node& targetNode) {
+		Node* findUpstreamNode(Node& targetNode) const {
             if (targetNode.inputs.empty()) {
-				SDL_Log("findUpstreamNode: target node %lu has no inputs", (int)targetNode.id.Get());
+				SDL_Log("findUpstreamNode: target node %lu has no inputs", targetNode.id.Get());
 				return nullptr;
 			}
 
-			SDL_Log("findUpstreamNode: target node %lu has %d input pins", (int)targetNode.id.Get(), (int)targetNode.inputs.size());
+			SDL_Log("findUpstreamNode: target node %lu has %d input pins", targetNode.id.Get(), targetNode.inputs.size());
 
 			// Search all input pins for an incoming link.
 			for (const auto& targetInputPin : targetNode.inputs) {
-				SDL_Log("findUpstreamNode: checking inputPin %lu for node %lu", (int)targetInputPin.Get(), (int)targetNode.id.Get());
+				SDL_Log("findUpstreamNode: checking inputPin %lu for node %lu", targetInputPin.Get(), targetNode.id.Get());
 				for (const auto& link : links) {
-					SDL_Log(" findUpstreamNode: link id=%lu start=%lu end=%lu", (int)link.id.Get(), (int)link.startPin.Get(), (int)link.endPin.Get());
+					SDL_Log(" findUpstreamNode: link id=%lu start=%lu end=%lu", link.id.Get(), link.startPin.Get(), link.endPin.Get());
 					if (link.endPin == targetInputPin) {
 						Node* owner = findNodeOwningPin(link.startPin);
 						if (owner) {
-							SDL_Log("findUpstreamNode: found upstream node %lu via link %lu", (int)owner->id.Get(), (int)link.id.Get());
+							SDL_Log("findUpstreamNode: found upstream node %lu via link %lu", owner->id.Get(), link.id.Get());
 						} else {
-							SDL_Log("findUpstreamNode: found link %lu but owner not found for startPin %lu", (int)link.id.Get(), (int)link.startPin.Get());
+							SDL_Log("findUpstreamNode: found link %lu but owner not found for startPin %lu", link.id.Get(), link.startPin.Get());
 						}
 						return owner;
 					}
 				}
 			}
 
-			SDL_Log("findUpstreamNode: no upstream found for node %lu", (int)targetNode.id.Get());
+			SDL_Log("findUpstreamNode: no upstream found for node %lu", targetNode.id.Get());
 			return nullptr;
 		}
 
@@ -638,7 +625,7 @@ class Application {
 				 int& outNumBlocks,
 				 int& outFormat,
 				 CompressionNode::CompressionType compressionType) {
-			SDL_Log("compressSurfaceToBlocks: starting compression for type %d", (int)compressionType);
+			SDL_Log("compressSurfaceToBlocks: starting compression for type %d", static_cast<int>(compressionType));
 			if (inputSurface == nullptr) {
 				SDL_Log("compressSurfaceToBlocks: inputSurface is null");
 				return false;
@@ -659,7 +646,7 @@ class Application {
 				bc7enc_compress_image_from_memory(surface->w, surface->h, surface->pixels, params, &output);
 
 				if (output.blocks && output.num_blocks > 0 && output.bytes_per_block > 0) {
-					size_t totalBytes = static_cast<size_t>(output.num_blocks) * static_cast<size_t>(output.bytes_per_block);
+					const size_t totalBytes = static_cast<size_t>(output.num_blocks) * static_cast<size_t>(output.bytes_per_block);
 					outBlocks.assign(output.blocks, output.blocks + totalBytes);
 					outWidth = output.width;
 					outHeight = output.height;
@@ -677,12 +664,12 @@ class Application {
 				SDL_DestroySurface(surface);
 				return true;
 			} else {
-				// Use rgbcx encoder for BC1/3/4/5 
-				int width = surface->w;
-				int height = surface->h;
-				int blocks_x = (width + 3) / 4;
-				int blocks_y = (height + 3) / 4;
-				int num_blocks = blocks_x * blocks_y;
+				// Use rgbcx encoder for BC1/3/4/5
+				const int width = surface->w;
+				const int height = surface->h;
+				const int blocks_x = (width + 3) / 4;
+				const int blocks_y = (height + 3) / 4;
+				const int num_blocks = blocks_x * blocks_y;
 				int bytes_per_block = 0;
 				int dxgi_format = 0;
 
@@ -705,11 +692,11 @@ class Application {
 						// fill block_pixels from surface, pad with zeros for out-of-range pixels
 						for (int py = 0; py < 4; ++py) {
 							for (int px = 0; px < 4; ++px) {
-								int x = bx * 4 + px;
-								int y = by * 4 + py;
-								int idx = (py * 4 + px) * 4;
+								const int x = bx * 4 + px;
+								const int y = by * 4 + py;
+								const int idx = (py * 4 + px) * 4;
 								if (x < width && y < height) {
-									uint8_t* src = reinterpret_cast<uint8_t*>(surface->pixels) + (y * surface->pitch) + (x * 4);
+									const uint8_t* src = reinterpret_cast<uint8_t*>(surface->pixels) + (y * surface->pitch) + (x * 4);
 									block_pixels[idx + 0] = src[0];
 									block_pixels[idx + 1] = src[1];
 									block_pixels[idx + 2] = src[2];
@@ -741,6 +728,8 @@ class Application {
 							case CompressionNode::CompressionType::BC2:
 								rgbcx::encode_bc3(10, dst, block_pixels); // approx BC2 with BC3
 								break;
+							default:
+                        		break;
 						}
 					}
 				}
@@ -871,7 +860,7 @@ class Application {
 			NodeImGui::Begin("Node Editor");
 
 
-			for (auto& node : nodes) {
+			for (const auto& node : nodes) {
 				NodeImGui::BeginNode(node->id);
 
 			// Push a unique ImGui ID per node to avoid "SameID" collisions
@@ -940,7 +929,7 @@ class Application {
 								graphEdges.push_back(edge);
 								links.push_back(link);
 
-                    SDL_Log("Created link id=%lu start=%lu end=%lu", (int)link.id.Get(), (int)link.startPin.Get(), (int)link.endPin.Get());
+                    SDL_Log("Created link id=%lu start=%lu end=%lu", link.id.Get(), link.startPin.Get(), link.endPin.Get());
 							} else if (firstIsInput && secondIsOutput) {
 								link.startPin = secondPin;
 								link.endPin = firstPin;
@@ -950,12 +939,11 @@ class Application {
 								edge.destination = firstNode;
 								graphEdges.push_back(edge);
 								links.push_back(link);
-                   SDL_Log("Created link id=%lu start=%lu end=%lu", (int)link.id.Get(), (int)link.startPin.Get(), (int)link.endPin.Get());
+                   SDL_Log("Created link id=%lu start=%lu end=%lu", link.id.Get(), link.startPin.Get(), link.endPin.Get());
 							}
 						}
 					}
 				}
-
 				NodeImGui::EndCreate();
 			}
 
@@ -975,10 +963,8 @@ class Application {
 						removeNode(nodeId);
 					}
 				}
-
 				NodeImGui::EndDelete();
 			}
-
 			NodeImGui::End();
 		}
 
@@ -991,8 +977,8 @@ class Application {
 
 		// Will return the node-path as a vector of Node* from the output node
 		// to the input node, or an empty vector if no path exists
-		std::vector<Node*> findPathBetweenInputAndOutput(
-			NodeImGui::NodeId outputNodeId) {
+		[[nodiscard]] std::vector<Node*> findPathBetweenInputAndOutput(
+			const NodeImGui::NodeId outputNodeId) const {
 			std::stack<std::pair<Node*, std::vector<Node*>>>
 				st;	 // branch stack and saved branch paths
 			std::unordered_set<Node*> visited;
@@ -1037,8 +1023,9 @@ class Application {
 				SDL_Log("processPath: empty path");
 				return false;
 			}
-			// First element should be the input node and must contain either a surface or a source file.
-			Node* inputNode = path.front();
+			// First element should be the input node and must contain either a
+			// surface or a source file.
+			const Node* inputNode = path.front();
 			if (!inputNode) {
 				SDL_Log("processPath: input node null");
 				return false;
@@ -1053,8 +1040,6 @@ class Application {
 				currentSurface = IMG_Load(inputNode->sourceFile.c_str());
 			}
 
-
-
 			// Iterate nodes after the input node and feed the currentSurface through
 			for (size_t i = 1; i < path.size(); ++i) {
 				Node* node = path[i];
@@ -1063,9 +1048,9 @@ class Application {
 					if (currentSurface) SDL_DestroySurface(currentSurface);
 					return false;
 				}
-				SDL_Log("processPath: running %s (ID: %lu)", (node->name()), (unsigned long)node->id.Get());
+				SDL_Log("processPath: running %s (ID: %lu)", (node->name()), node->id.Get());
 				if (!node->process(*this, renderer, path[i - 1], currentSurface)) {
-					SDL_Log("processPath: node processing failed for %s (ID: %lu)", (node->name()), (unsigned long)node->id.Get());
+					SDL_Log("processPath: node processing failed for %s (ID: %lu)", (node->name()), node->id.Get());
 					if (currentSurface) SDL_DestroySurface(currentSurface);
 					return false;
 				}
@@ -1080,21 +1065,24 @@ class Application {
 			return true;
 		}
 
-
 		// Decode raw compressed blocks (from any encoder) into an SDL_Surface for preview.
-		SDL_Surface* decodeBlocksToSurface(const void* blocks, int bytes_per_block, int num_blocks, int width, int height, int format) {
+		SDL_Surface* decodeBlocksToSurface(const void* blocks,
+										   const int bytes_per_block,
+										   const int num_blocks,
+										   const int width, const int height,
+										   const int format) {
 			if (blocks == nullptr || num_blocks <= 0 || width <= 0 || height <= 0) return nullptr;
 
-			const int bytes_per_pixel = 4;
+			constexpr int bytes_per_pixel = 4;
 			std::vector<uint8_t> pixels(static_cast<size_t>(width) * static_cast<size_t>(height) * bytes_per_pixel);
 
-			int blocks_x = (width + 3) / 4;
-			int blocks_y = (height + 3) / 4;
+			const int blocks_x = (width + 3) / 4;
+			const int blocks_y = (height + 3) / 4;
 			int bc1_failures = 0;
 
 			for (int by = 0; by < blocks_y; ++by) {
 				for (int bx = 0; bx < blocks_x; ++bx) {
-					int block_index = by * blocks_x + bx;
+					const int block_index = by * blocks_x + bx;
 					if (block_index >= num_blocks) break;
 					const uint8_t* block_ptr = reinterpret_cast<const uint8_t*>(blocks) + static_cast<size_t>(block_index) * static_cast<size_t>(bytes_per_block);
 					uint8_t block_pixels[16 * 4];
@@ -1141,11 +1129,11 @@ class Application {
 
 					for (int py = 0; py < 4; ++py) {
 						for (int px = 0; px < 4; ++px) {
-							int x = bx * 4 + px;
-							int y = by * 4 + py;
+							const int x = bx * 4 + px;
+							const int y = by * 4 + py;
 							if (x >= width || y >= height) continue;
-							int dst = (y * width + x) * bytes_per_pixel;
-							int src = py * 4 + px;
+							const int dst = (y * width + x) * bytes_per_pixel;
+							const int src = py * 4 + px;
 							pixels[dst + 0] = block_pixels[src * 4 + 0];
 							pixels[dst + 1] = block_pixels[src * 4 + 1];
 							pixels[dst + 2] = block_pixels[src * 4 + 2];
@@ -1166,10 +1154,6 @@ class Application {
             
 			return surf;
 		}
-
-		
-
-
 	};
 
 	NodeEditor nodeEditor;
@@ -1239,7 +1223,6 @@ class Application {
 
 		node->id = nodeEditor.getUniqueId();
 
-
 		for (int i = 0; i < 2; ++i) {
 			node->inputs.push_back(nodeEditor.getUniquePinId());
 		}
@@ -1248,7 +1231,7 @@ class Application {
 			node->outputs.push_back(nodeEditor.getUniquePinId());
 		}
 
-		ImVec2 center = ImGui::GetMainViewport()->GetCenter();
+		const ImVec2 center = ImGui::GetMainViewport()->GetCenter();
 		NodeImGui::SetNodePosition(node->id, ImVec2(center.x, center.y));
 
 		nodeEditor.addNode(std::move(node));
@@ -1261,7 +1244,7 @@ class Application {
 		node->outputs.push_back(nodeEditor.getUniquePinId());
 		node->isInputNode = true;
 
-		ImVec2 center = ImGui::GetMainViewport()->GetCenter();
+		const ImVec2 center = ImGui::GetMainViewport()->GetCenter();
 		NodeImGui::SetNodePosition(node->id, ImVec2(center.x, center.y));
 
 		nodeEditor.addNode(std::move(node));
@@ -1274,20 +1257,21 @@ class Application {
 		node->inputs.push_back(nodeEditor.getUniquePinId());
 		node->isOutputNode = true;
 
-		ImVec2 center = ImGui::GetMainViewport()->GetCenter();
+		const ImVec2 center = ImGui::GetMainViewport()->GetCenter();
 		NodeImGui::SetNodePosition(node->id, ImVec2(center.x, center.y));
 
 		nodeEditor.addNode(std::move(node));
 	}
 
-	void CreateCompressionNode(NodeEditor::CompressionNode::CompressionType compressionType) {
+	void CreateCompressionNode(
+		const NodeEditor::CompressionNode::CompressionType compressionType) {
 		auto node = std::make_unique<NodeEditor::CompressionNode>();
 		node->compressionType = compressionType;
 		node->id = nodeEditor.getUniqueId();
 		node->inputs.push_back(nodeEditor.getUniquePinId());
 		node->outputs.push_back(nodeEditor.getUniquePinId());
 
-		ImVec2 center = ImGui::GetMainViewport()->GetCenter();
+		const ImVec2 center = ImGui::GetMainViewport()->GetCenter();
 		NodeImGui::SetNodePosition(node->id, ImVec2(center.x, center.y));
 
 		nodeEditor.addNode(std::move(node));
@@ -1397,8 +1381,7 @@ class Application {
 				"This node will be used to generate mipmaps for the input "
 				"images. "
 				"You can choose the number of mipmap levels to generate, and "
-				"the "
-				"filtering method to use.");
+				"the filtering method to use.");
 			ImGui::SeparatorText("Options");
 		}
 		if (ImGui::CollapsingHeader("Effects")) {
@@ -1406,7 +1389,7 @@ class Application {
 			ImGui::BeginChild("ChildR", ImVec2(0, 160));
 			if (ImGui::BeginTable("Effects' table", 1)) {
 				ImGui::TableNextColumn();
-
+				//Placeholder-buttons
 				if (ImGui::Button("2D Convolution")) {
 				}
 
@@ -1530,8 +1513,6 @@ class Application {
 				if (ImGui::Button("USTC")) {
 				}
 
-				
-
 				ImGui::EndTable();
 				ImGui::EndChild();
 				ImGui::Dummy(ImVec2(0.0f, 10.0f));
@@ -1562,7 +1543,7 @@ class Application {
 			HelpMarker(
 				"Converts the image to an object-space normal map: exports "
 				"the normal vector (x y z) as the color (saknas text) and "
-				"can apply cube map coordinate space onversion if the "
+				"can apply cube map coordinate space conversion if the "
 				"image is a cube map");
 		}
 
@@ -1606,8 +1587,9 @@ class Application {
 			}
 
 			if (ImGui::BeginMenu("Help")) {
-				ImGui::MenuItem("Github: ");
-				// fixa länk typ?
+				if (ImGui::MenuItem("GitHub")) {
+					SDL_OpenURL("https://github.com/MuhammedReza07/dd1367-project");
+				}
 				ImGui::EndMenu();
 			}
 			ImGui::EndMainMenuBar();
