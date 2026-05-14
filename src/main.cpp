@@ -45,7 +45,7 @@ std::vector<std::string> selected_files;  // Vector (aka C++ ArrayList) to store
 std::vector<SDL_Texture*> original_textures;
 
 // Callback function used to bring up file explorer dialog
-static void SDLCALL callback(void* userdata, const char* const* filelist,
+static void SDLCALL load_callback(void* userdata, const char* const* filelist,
 							 const int filter) {
 	if (!filelist) {
 		SDL_Log("An error occurred: %s", SDL_GetError());
@@ -81,6 +81,19 @@ static void SDLCALL callback(void* userdata, const char* const* filelist,
 	}
 }
 
+std::string selected_folder;
+static void SDLCALL folder_callback(void* userdata, const char* const* foldername, const int filter) {
+	if (!foldername) {
+		SDL_Log("An error occurred: %s", SDL_GetError());
+		return;
+	} else if (!*foldername) {
+		SDL_Log("The user did not select any folder.");
+		SDL_Log("Most likely, the dialog was canceled.");
+		return;
+	}
+	selected_folder = *foldername;
+	selected_folder += "/";
+}
 // Because RAII is pretty nice <3
 class Application {
    private:
@@ -138,7 +151,7 @@ class Application {
 			// intact for downstream preview/processing.
 			virtual bool process(NodeEditor& editor, SDL_Renderer* renderer,
 								 Node* inputNode,
-								 SDL_Surface*& currentSurface) {
+								 SDL_Surface*& currentSurface, Application* app) {
 				return true;
 			}
 		};
@@ -160,7 +173,7 @@ class Application {
 
 			void renderBody(Application* app, NodeEditor& editor) override {
 				if (ImGui::Button("Import Image")) {
-					SDL_ShowOpenFileDialog(callback, app->renderer, app->window,
+					SDL_ShowOpenFileDialog(load_callback, app->renderer, app->window,
 										   dialog_filters.data(),
 										   SDL_arraysize(dialog_filters),
 										   nullptr, true);
@@ -220,7 +233,11 @@ class Application {
 			}
 
 			void renderBody(Application* app, NodeEditor& editor) override {
-				if (ImGui::Button("Process chain")) {
+				if (selected_folder.empty()) {
+					if (ImGui::Button("Select folder")) {
+						SDL_ShowOpenFolderDialog(folder_callback, nullptr, app->window, nullptr, false);
+					}
+				} else if (ImGui::Button("Process chain")) {
 					processingPath =
 						editor.findPathBetweenInputAndOutput(this->id);
 
@@ -232,7 +249,7 @@ class Application {
 								processingPath.size());
 						SDL_Log("Input node: %s (ID: %lu)", inputNode->name(),
 								inputNode->id.Get());
-						editor.processPath(processingPath, app->renderer);
+						editor.processPath(processingPath, app->renderer, app);
 					} else {
 						SDL_Log("No path found");
 					}
@@ -263,7 +280,7 @@ class Application {
 
 			bool process(NodeEditor& editor, SDL_Renderer* renderer,
 						 Node* previousNode,
-						 SDL_Surface*& currentSurface) override {
+						 SDL_Surface*& currentSurface, Application* app) override {
 				fallbackToDisk = false;
 
 				if (previousNode == nullptr) {
@@ -305,7 +322,7 @@ class Application {
 
 			bool process(NodeEditor& editor, SDL_Renderer* renderer,
 						 Node* inputNode,
-						 SDL_Surface*& currentSurface) override {
+						 SDL_Surface*& currentSurface, Application* app) override {
 				return true;
 			}
 		};
@@ -322,14 +339,14 @@ class Application {
 
 			bool process(NodeEditor& editor, SDL_Renderer* renderer,
 						 Node* inputNode,
-						 SDL_Surface*& currentSurface) override {
+						 SDL_Surface*& currentSurface, Application* app) override {
 				if (inputNode == nullptr) {
 					SDL_Log("Effect node has no input.");
 					return false;
 				}
 
 				if (!inputNode->process(editor, renderer, inputNode,
-										currentSurface)) {
+										currentSurface, app)) {
 					return false;
 				}
 
@@ -387,7 +404,7 @@ class Application {
 
 			bool process(NodeEditor& editor, SDL_Renderer* renderer,
 						 Node* inputNode,
-						 SDL_Surface*& currentSurface) override {
+						 SDL_Surface*& currentSurface, Application* app) override {
 				if (inputNode == nullptr) {
 					SDL_Log("Compression node has no input.");
 					return false;
@@ -445,7 +462,7 @@ class Application {
 											: src.substr(slash + 1);
 					size_t dot = fname.find_last_of('.');
 					if (dot != std::string::npos) fname = fname.substr(0, dot);
-					outName = fname + "_" + typeName + ".dds";
+					outName = selected_folder + fname + "_" + typeName + ".dds";
 				} else {
 					outName = typeName + "_compressed.dds";
 				}
@@ -1097,7 +1114,7 @@ class Application {
 		// `sourceFile` to the current file, call its `process` method and
 		// advance the current file to the node's `outputFile` if it was set.
 		bool processPath(const std::vector<Node*>& path,
-						 SDL_Renderer* renderer) {
+						 SDL_Renderer* renderer, Application* app) {
 			if (path.empty()) {
 				SDL_Log("processPath: empty path");
 				return false;
@@ -1132,7 +1149,7 @@ class Application {
 				SDL_Log("processPath: running %s (ID: %lu)", node->name(),
 						node->id.Get());
 				if (!node->process(*this, renderer, path[i - 1],
-								   currentSurface)) {
+								   currentSurface, app)) {
 					SDL_Log(
 						"processPath: node processing failed for %s (ID: %lu)",
 						node->name(), node->id.Get());
@@ -1663,9 +1680,12 @@ class Application {
 
 	// menu for handling "projects"? like saving graphs, and IDK. it's the top
 	// main menu bar, like the one you usually see in apps
-	static void ShowMainMenuBar() {
+	void ShowMainMenuBar() const {
 		if (ImGui::BeginMainMenuBar()) {
 			if (ImGui::BeginMenu("File")) {
+				if (ImGui::MenuItem("Select folder...")) {
+					SDL_ShowOpenFolderDialog(folder_callback, nullptr, window, nullptr, false);
+				}
 				ImGui::EndMenu();
 			}
 
