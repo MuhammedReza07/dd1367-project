@@ -11,9 +11,9 @@
 #include <imgui.h>
 #include <imgui_node_editor.h>
 #include <libbc7enc.h>
+#include <rdo_bc_encoder.h>
 #include <rgbcx.h>
 #include <utils.h>
-#include <rdo_bc_encoder.h>
 
 #include <algorithm>
 #include <array>
@@ -48,7 +48,7 @@ std::vector<SDL_Texture*> original_textures;
 
 // Callback function used to bring up file explorer dialog
 static void SDLCALL load_callback(void* userdata, const char* const* filelist,
-							 const int filter) {
+								  const int filter) {
 	if (!filelist) {
 		SDL_Log("An error occurred: %s", SDL_GetError());
 		return;
@@ -84,7 +84,9 @@ static void SDLCALL load_callback(void* userdata, const char* const* filelist,
 }
 
 std::string selected_folder;
-static void SDLCALL folder_callback(void* userdata, const char* const* foldername, const int filter) {
+static void SDLCALL folder_callback(void* userdata,
+									const char* const* foldername,
+									const int filter) {
 	if (!foldername) {
 		SDL_Log("An error occurred: %s", SDL_GetError());
 		return;
@@ -152,8 +154,8 @@ class Application {
 			// should populate `compressedBlocks` but may leave `currentSurface`
 			// intact for downstream preview/processing.
 			virtual bool process(NodeEditor& editor, SDL_Renderer* renderer,
-								 Node* inputNode,
-								 SDL_Surface*& currentSurface, Application* app) {
+								 Node* inputNode, SDL_Surface*& currentSurface,
+								 Application* app) {
 				return true;
 			}
 		};
@@ -175,8 +177,8 @@ class Application {
 
 			void renderBody(Application* app, NodeEditor& editor) override {
 				if (ImGui::Button("Import Image")) {
-					SDL_ShowOpenFileDialog(load_callback, app->renderer, app->window,
-										   dialog_filters.data(),
+					SDL_ShowOpenFileDialog(load_callback, app->renderer,
+										   app->window, dialog_filters.data(),
 										   SDL_arraysize(dialog_filters),
 										   nullptr, true);
 					this->containsImage = true;
@@ -236,10 +238,11 @@ class Application {
 			}
 
 			void renderBody(Application* app, NodeEditor& editor) override {
-        ImGui::Checkbox("Generate mipmaps", &generateMipmaps);
+				ImGui::Checkbox("Generate mipmaps", &generateMipmaps);
 				if (selected_folder.empty()) {
 					if (ImGui::Button("Select folder")) {
-						SDL_ShowOpenFolderDialog(folder_callback, nullptr, app->window, nullptr, false);
+						SDL_ShowOpenFolderDialog(folder_callback, nullptr,
+												 app->window, nullptr, false);
 					}
 				} else if (ImGui::Button("Process chain")) {
 					processingPath =
@@ -253,7 +256,8 @@ class Application {
 								processingPath.size());
 						SDL_Log("Input node: %s (ID: %lu)", inputNode->name(),
 								inputNode->id.Get());
-						editor.processPath(processingPath, app->renderer, app, generateMipmaps);
+						editor.processPath(processingPath, app->renderer, app,
+										   generateMipmaps);
 					} else {
 						SDL_Log("No path found");
 					}
@@ -267,9 +271,9 @@ class Application {
 					float width, height;
 					SDL_GetTextureSize(texture, &width, &height);
 
-					const float maxWidth =
-						1000.0f / width;  // Scale down if texture is wider than
-										  // 1000 pixels
+					const float maxWidth =	// Scale down if texture is wider
+						1000.0f / width;	// than 1000 pixels
+
 					const float scaleFactor = std::min(maxWidth, 1.0f);
 
 					const ImVec2 scaledSize(width * scaleFactor,
@@ -283,8 +287,8 @@ class Application {
 			}
 
 			bool process(NodeEditor& editor, SDL_Renderer* renderer,
-						 Node* previousNode,
-						 SDL_Surface*& currentSurface, Application* app) override {
+						 Node* previousNode, SDL_Surface*& currentSurface,
+						 Application* app) override {
 				fallbackToDisk = false;
 
 				if (previousNode == nullptr) {
@@ -325,8 +329,8 @@ class Application {
 			}
 
 			bool process(NodeEditor& editor, SDL_Renderer* renderer,
-						 Node* inputNode,
-						 SDL_Surface*& currentSurface, Application* app) override {
+						 Node* inputNode, SDL_Surface*& currentSurface,
+						 Application* app) override {
 				return true;
 			}
 		};
@@ -342,8 +346,8 @@ class Application {
 			}
 
 			bool process(NodeEditor& editor, SDL_Renderer* renderer,
-						 Node* inputNode,
-						 SDL_Surface*& currentSurface, Application* app) override {
+						 Node* inputNode, SDL_Surface*& currentSurface,
+						 Application* app) override {
 				if (inputNode == nullptr) {
 					SDL_Log("Effect node has no input.");
 					return false;
@@ -377,7 +381,7 @@ class Application {
 		   public:
 			bool isFinalCompressionNode = false;
 			bool generateMipmapsForExport = false;
-			
+
 			enum class CompressionType { BC7, BC5, BC4, BC3, BC2, BC1 };
 
 			CompressionType compressionType = CompressionType::BC7;
@@ -410,8 +414,8 @@ class Application {
 			}
 
 			bool process(NodeEditor& editor, SDL_Renderer* renderer,
-						 Node* inputNode,
-						 SDL_Surface*& currentSurface, Application* app) override {
+						 Node* inputNode, SDL_Surface*& currentSurface,
+						 Application* app) override {
 				if (inputNode == nullptr) {
 					SDL_Log("Compression node has no input.");
 					return false;
@@ -431,9 +435,8 @@ class Application {
 				}
 
 				// Choose an output filename. Prefer a descriptive name using
-				// the
-				// source file base name and compression type so it's easy to
-				// find.
+				// the source file base name and compression type so it's
+				// easy to find.
 				std::string typeName;
 				DXGI_FORMAT selectedDxgiFormat = DXGI_FORMAT_UNKNOWN;
 				switch (compressionType) {
@@ -494,13 +497,12 @@ class Application {
 					this->compressedBytesPerBlock = bytes_per_block;
 					this->compressedNumBlocks = num_blocks;
 					this->compressedFormat = format;
-					
+
 				} else {
 					SDL_Log("Failed to compress surface to blocks.");
 					return false;
 				}
 
-				
 				SDL_Surface* decoded = nullptr;
 				if (!this->compressedBlocks.empty()) {
 					decoded = editor.decodeBlocksToSurface(
@@ -517,8 +519,7 @@ class Application {
 
 					texture = SDL_CreateTextureFromSurface(renderer, decoded);
 
-					
-				if (isFinalCompressionNode) {
+					if (isFinalCompressionNode) {
 						utils::image_u8 img;
 
 						if (!editor.surfaceToImageU8(surfaceToCompress, img)) {
@@ -624,12 +625,12 @@ class Application {
 
 		Node* findUpstreamNode(Node& targetNode) const {
 			if (targetNode.inputs.empty()) {
-				SDL_Log("findUpstreamNode: target node %zu has no inputs",
+				SDL_Log("findUpstreamNode: target node %lu has no inputs",
 						targetNode.id.Get());
 				return nullptr;
 			}
 
-			SDL_Log("findUpstreamNode: target node %zu has %zu input pins",
+			SDL_Log("findUpstreamNode: target node %lu has %d input pins",
 					targetNode.id.Get(), targetNode.inputs.size());
 
 			// Search all input pins for an incoming link.
@@ -644,14 +645,14 @@ class Application {
 						Node* owner = findNodeOwningPin(link.startPin);
 						if (owner) {
 							SDL_Log(
-								"findUpstreamNode: found upstream node %d via "
-								"link %d",
-								(int)owner->id.Get(), (int)link.id.Get());
+								"findUpstreamNode: found upstream node %lu via "
+								"link %lu",
+								owner->id.Get(), link.id.Get());
 						} else {
 							SDL_Log(
-								"findUpstreamNode: found link %d but owner "
-								"not found for startPin %d",
-								(int)link.id.Get(), (int)link.startPin.Get());
+								"findUpstreamNode: found link %lu but owner "
+								"not found for startPin %lu",
+								link.id.Get(), link.startPin.Get());
 						}
 						return owner;
 					}
@@ -944,9 +945,9 @@ class Application {
 								graphEdges.push_back(edge);
 								links.push_back(link);
 
-								SDL_Log("Created link id=%d start=%d end=%d",
-										(int)link.id.Get(), (int)link.startPin.Get(),
-										(int)link.endPin.Get());
+								SDL_Log("Created link id=%lu start=%lu end=%lu",
+										link.id.Get(), link.startPin.Get(),
+										link.endPin.Get());
 							} else if (firstIsInput && secondIsOutput) {
 								link.startPin = secondPin;
 								link.endPin = firstPin;
@@ -956,9 +957,9 @@ class Application {
 								edge.destination = firstNode;
 								graphEdges.push_back(edge);
 								links.push_back(link);
-								SDL_Log("Created link id=%d start=%d end=%d",
-										(int)link.id.Get(), (int)link.startPin.Get(),
-										(int)link.endPin.Get());
+								SDL_Log("Created link id=%lu start=%lu end=%lu",
+										link.id.Get(), link.startPin.Get(),
+										link.endPin.Get());
 							}
 						}
 					}
@@ -1037,8 +1038,8 @@ class Application {
 		// For each node in the path (skipping the input node) set its
 		// `sourceFile` to the current file, call its `process` method and
 		// advance the current file to the node's `outputFile` if it was set.
-		bool processPath(const std::vector<Node*>& path,
-						 SDL_Renderer* renderer, Application* app, bool generateMipmaps) {
+		bool processPath(const std::vector<Node*>& path, SDL_Renderer* renderer,
+						 Application* app, const bool generateMipmaps) {
 			if (path.empty()) {
 				SDL_Log("processPath: empty path");
 				return false;
@@ -1068,15 +1069,13 @@ class Application {
 			CompressionNode* lastCompressionNode = nullptr;
 
 			if (generateMipmaps) {
-			SDL_Log("processPath: mipmap generation enabled");
+				SDL_Log("processPath: mipmap generation enabled");
 			}
-				for (Node* node : path) {
-					if (auto* compression = dynamic_cast<CompressionNode*>(node)) {
-						lastCompressionNode = compression;
-						
-					}
+			for (Node* node : path) {
+				if (auto* compression = dynamic_cast<CompressionNode*>(node)) {
+					lastCompressionNode = compression;
 				}
-			
+			}
 
 			// Iterate nodes after the input node and feed the currentSurface
 			// through
@@ -1087,8 +1086,8 @@ class Application {
 					if (currentSurface) SDL_DestroySurface(currentSurface);
 					return false;
 				}
-				SDL_Log("processPath: running %s (ID: %d)", node->name(),
-						(int)node->id.Get());
+				SDL_Log("processPath: running %s (ID: %lu)", node->name(),
+						node->id.Get());
 				if (auto* compression = dynamic_cast<CompressionNode*>(node)) {
 					compression->isFinalCompressionNode =
 						compression == lastCompressionNode;
@@ -1096,11 +1095,11 @@ class Application {
 					compression->generateMipmapsForExport =
 						generateMipmaps && compression == lastCompressionNode;
 				}
-				if (!node->process(*this, renderer, path[i - 1],
-								   currentSurface, app)) {
+				if (!node->process(*this, renderer, path[i - 1], currentSurface,
+								   app)) {
 					SDL_Log(
-						"processPath: node processing failed for %s (ID: %d)",
-						node->name(), (int)node->id.Get());
+						"processPath: node processing failed for %s (ID: %lu)",
+						node->name(), node->id.Get());
 					if (currentSurface) SDL_DestroySurface(currentSurface);
 					return false;
 				}
@@ -1114,7 +1113,6 @@ class Application {
 			SDL_Log("processPath: finished");
 			return true;
 		}
-
 
 		static bool surfaceToImageU8(SDL_Surface* src, utils::image_u8& dst) {
 			if (!src) return false;
@@ -1149,14 +1147,13 @@ class Application {
 
 		// Decode raw compressed blocks (from any encoder) into an SDL_Surface
 		// for preview.
-		SDL_Surface* decodeBlocksToSurface(const void* blocks,
-										   const int bytes_per_block,
-										   const int num_blocks,
-										   const int width, const int height,
-										   const int format) {
+		static SDL_Surface* decodeBlocksToSurface(
+			const void* blocks, const int bytes_per_block, const int num_blocks,
+			const int width, const int height, const int format) {
 			if (blocks == nullptr || num_blocks <= 0 || width <= 0 ||
-				height <= 0)
+				height <= 0) {
 				return nullptr;
+			}
 
 			constexpr int bytes_per_pixel = 4;
 			std::vector<uint8_t> pixels(static_cast<size_t>(width) *
@@ -1175,8 +1172,7 @@ class Application {
 						reinterpret_cast<const uint8_t*>(blocks) +
 						static_cast<size_t>(block_index) *
 							static_cast<size_t>(bytes_per_block);
-					uint8_t block_pixels[16 * 4];
-					memset(block_pixels, 0, sizeof(block_pixels));
+					uint8_t block_pixels[16 * 4] = {};
 
 					if (format == DXGI_FORMAT_BC7_UNORM) {
 						bc7decomp::color_rgba out_colors[16];
@@ -1664,7 +1660,8 @@ class Application {
 		if (ImGui::BeginMainMenuBar()) {
 			if (ImGui::BeginMenu("File")) {
 				if (ImGui::MenuItem("Select folder...")) {
-					SDL_ShowOpenFolderDialog(folder_callback, nullptr, window, nullptr, false);
+					SDL_ShowOpenFolderDialog(folder_callback, nullptr, window,
+											 nullptr, false);
 				}
 				ImGui::EndMenu();
 			}
@@ -1713,7 +1710,7 @@ class Application {
 							 ImGuiWindowFlags_NoMove)) {
 			HelpMarker(
 				"Tip: \n Press DELETE KEY to remove nodes \n Press F to "
-				"center on graph");
+				"center on graph \n Change selected folder in the File-menu");
 			ImGui::SameLine();
 			ImGui::Text("          Node count: %lu", nodeEditor.nodes.size());
 			if (ImGui::IsMousePosValid()) {
