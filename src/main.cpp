@@ -817,7 +817,8 @@ class Application {
 									const uint8_t* src =
 										reinterpret_cast<uint8_t*>(
 											surface->pixels) +
-										(y * surface->pitch) +
+										(static_cast<ptrdiff_t>(
+											y * surface->pitch)) +
 										(static_cast<ptrdiff_t>(x * 4));
 									block_pixels[idx + 0] = src[0];
 									block_pixels[idx + 1] = src[1];
