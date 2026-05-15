@@ -1,9 +1,26 @@
-# Who needs a README when you are a 1337 h4x0r?
+# TextureFlows
+TextureFlows is an open source texture packing flow-editor inspired by 
+[Texture Sets](https://github.com/electronicarts/texturesets)
+by Electronic Arts written in C++. The app is completely cross-platform and 
+runs on both Windows, Linux and macOS.
 
-Okay, but seriously... We probably should make one no matter how 1337 we may be :3
+![demo.gif](./assets/demo.gif)
+
+Using the node-graph, users can combine different block compression formats
+and chain them together to convert their textures from PNG or JPG to DDS-files,
+and view the result of the compression right in the editor. The files are also saved
+to your local machine after processing. TextureFlows currently supports BC1, BC3-5
+and BC7 compression. An example of how the compression looks like can be found below,
+with the original (very zoomed in) image on the left, and the result of BC3 compression
+on the right.
+
+![comparisson](./assets/original_vs_bc3.jpeg)
+
+In the future, mip-map generation and other essential texture-packing features are
+planned to be incorporated, along with a proper release!
 
 # Run
-Run `./build/<build-type-lowercase>/bin/main` from the root directory to get an ImGui demo window!
+Run `./build/<build-type-lowercase>/bin/main` from the root directory to start the application!
 
 # Dependencies
 When building on Linux, make sure that all the dependencies of SDL are installed on your system. For more
@@ -15,6 +32,7 @@ Building the application requires you to have CMake (version >= 3.29) and a C/C+
 installed on your system.
 
 ## Updating submodules
+
 This repository uses Git submodules to manage dependencies. To avoid making the `.git` folder bloated with gigabytes 
 worth of history for the external libraries, most submodules are set to be "shallow" per default. To initiate the 
 submodules after cloning the repository, run the following commands in the project root: 
@@ -22,7 +40,11 @@ submodules after cloning the repository, run the following commands in the proje
 git submodule init
 git submodule update --recursive
 ```
-Or, if you (for some reason) do not want shallow submodules and instead want the full history (and potentially unused
+<details>
+
+<summary>For developers unfamiliar with Git Submodules that want more information, click here</summary>
+
+If you (for some reason) do not want shallow submodules and instead want the full history (and potentially unused
 nested submodules), you can instead run the following: 
 ```
 git submodule update --init --recursive
@@ -34,7 +56,7 @@ of the extra data is pretty much useless for the average developer.
 In the majority of cases, any of these options will be enough to start development with all necessary external libraries. 
 
 However, if you wish to pull upstream changes from the submodules, you will have to manually switch branch or checkout the
-submodule, since they per default are in a "detatched HEAD"-state. To do this, simply navigate to the submodule you wish to 
+submodule, since they per default are in a "detached HEAD"-state. To do this, simply navigate to the submodule you wish to 
 update and run `git checkout <name_of_desired_branch>` and then run `git pull`. For example, lets say you are in the project
 root and wish to pull upstream changes from the library-branch of bc7enc\_rdo. To do that, you would do the following (after
 already running the commands above):
@@ -71,6 +93,8 @@ If you are using Windows, you will have to use something like Git Bash or WSL in
 
 Note that this script assumes you to already have set up your Git SSH keys properly.
 
+</details>
+
 ## Build types
 You may select a build configuration by setting the `CMAKE_BUILD_TYPE` variable when building the application,
 e.g. by passing `-DCMAKE_BUILD_TYPE=<build-type>` to `cmake`. You may also use one of the presets provided in
@@ -86,7 +110,7 @@ The file `CMakePresets.json` contains global CMake presets for this project and 
 If you wish to add local presets, you may do so by creating a `CMakeUserPresets.json` (which is ignored)
 and add them there.
 
-## Linux, MacOS and other UNIX-like systems
+## Linux, macOS and other UNIX-like systems
 If you have `make` installed on your system, you may build the application by running the following command
 in your preferred shell from the project root directory:
 ```
