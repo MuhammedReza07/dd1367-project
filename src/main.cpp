@@ -17,6 +17,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cstddef>
 #include <fstream>
 #include <memory>
 #include <stack>
@@ -713,9 +714,9 @@ class Application {
 
 		// Compress an in-memory SDL_Surface into raw compressed blocks and
 		// metadata. Returns true on success and fills `outBlocks` and metadata.
-		bool compressSurfaceToBlocks(
+		static bool compressSurfaceToBlocks(
 			SDL_Surface* inputSurface, std::vector<char>& outBlocks,
-			int& outWidth, int& outHeight, int& outBytesPerBlock,
+			int& outWidth, int& outHeight, int& outBytesPerBlock,  // NOLINT
 			int& outNumBlocks, int& outFormat,
 			CompressionNode::CompressionType compressionType) {
 			SDL_Log("compressSurfaceToBlocks: starting compression for type %d",
@@ -816,7 +817,8 @@ class Application {
 									const uint8_t* src =
 										reinterpret_cast<uint8_t*>(
 											surface->pixels) +
-										(y * surface->pitch) + (x * 4);
+										(y * surface->pitch) +
+										(static_cast<ptrdiff_t>(x * 4));
 									block_pixels[idx + 0] = src[0];
 									block_pixels[idx + 1] = src[1];
 									block_pixels[idx + 2] = src[2];
@@ -1123,11 +1125,13 @@ class Application {
 
 			dst.init(rgba->w, rgba->h);
 
-			uint8_t* pixels = static_cast<uint8_t*>(rgba->pixels);
+			const uint8_t* pixels = static_cast<uint8_t*>(rgba->pixels);
 
 			for (int y = 0; y < rgba->h; ++y) {
 				for (int x = 0; x < rgba->w; ++x) {
-					uint8_t* p = pixels + y * rgba->pitch + x * 4;
+					const uint8_t* p = pixels +
+									   static_cast<ptrdiff_t>(y * rgba->pitch) +
+									   static_cast<ptrdiff_t>(x * 4);
 
 					utils::color_quad_u8 c;
 
@@ -1147,11 +1151,11 @@ class Application {
 
 		// Decode raw compressed blocks (from any encoder) into an SDL_Surface
 		// for preview.
-		static SDL_Surface* decodeBlocksToSurface(
+		static SDL_Surface* decodeBlocksToSurface(	// NOLINTBEGIN
 			const void* blocks, const int bytes_per_block, const int num_blocks,
 			const int width, const int height, const int format) {
 			if (blocks == nullptr || num_blocks <= 0 || width <= 0 ||
-				height <= 0) {
+				height <= 0) {	// NOLINTEND
 				return nullptr;
 			}
 
