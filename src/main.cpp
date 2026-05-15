@@ -12,6 +12,8 @@
 #include <imgui_node_editor.h>
 #include <libbc7enc.h>
 #include <rgbcx.h>
+#include <utils.h>
+#include <rdo_bc_encoder.h>
 
 #include <algorithm>
 #include <array>
@@ -225,6 +227,7 @@ class Application {
 			std::vector<Node*> processingPath;
 			Node* inputNode = nullptr;
 			bool fallbackToDisk = false;
+			bool generateMipmaps = false;
 
 		   public:
 			OutputNode() { this->containsImage = false; }
@@ -233,6 +236,7 @@ class Application {
 			}
 
 			void renderBody(Application* app, NodeEditor& editor) override {
+        ImGui::Checkbox("Generate mipmaps", &generateMipmaps);
 				if (selected_folder.empty()) {
 					if (ImGui::Button("Select folder")) {
 						SDL_ShowOpenFolderDialog(folder_callback, nullptr, app->window, nullptr, false);
@@ -249,7 +253,7 @@ class Application {
 								processingPath.size());
 						SDL_Log("Input node: %s (ID: %lu)", inputNode->name(),
 								inputNode->id.Get());
-						editor.processPath(processingPath, app->renderer, app);
+						editor.processPath(processingPath, app->renderer, app, generateMipmaps);
 					} else {
 						SDL_Log("No path found");
 					}
@@ -371,6 +375,9 @@ class Application {
 
 		class CompressionNode : public Node {
 		   public:
+			bool isFinalCompressionNode = false;
+			bool generateMipmapsForExport = false;
+			
 			enum class CompressionType { BC7, BC5, BC4, BC3, BC2, BC1 };
 
 			CompressionType compressionType = CompressionType::BC7;
@@ -428,24 +435,31 @@ class Application {
 				// source file base name and compression type so it's easy to
 				// find.
 				std::string typeName;
+				DXGI_FORMAT selectedDxgiFormat = DXGI_FORMAT_UNKNOWN;
 				switch (compressionType) {
 					case CompressionType::BC7:
 						typeName = "BC7";
+						selectedDxgiFormat = DXGI_FORMAT_BC7_UNORM;
 						break;
 					case CompressionType::BC5:
 						typeName = "BC5";
+						selectedDxgiFormat = DXGI_FORMAT_BC5_UNORM;
 						break;
 					case CompressionType::BC4:
 						typeName = "BC4";
+						selectedDxgiFormat = DXGI_FORMAT_BC4_UNORM;
 						break;
 					case CompressionType::BC3:
 						typeName = "BC3";
+						selectedDxgiFormat = DXGI_FORMAT_BC3_UNORM;
 						break;
 					case CompressionType::BC2:
 						typeName = "BC2";
+						selectedDxgiFormat = DXGI_FORMAT_BC2_UNORM;
 						break;
 					case CompressionType::BC1:
 						typeName = "BC1";
+						selectedDxgiFormat = DXGI_FORMAT_BC1_UNORM;
 						break;
 					default:
 						typeName = "BC";
@@ -471,39 +485,22 @@ class Application {
 				std::vector<char> blocks;
 				int w = 0, h = 0, bytes_per_block = 0, num_blocks = 0,
 					format = 0;
-				if (!editor.compressSurfaceToBlocks(
+				if (editor.compressSurfaceToBlocks(
 						surfaceToCompress, blocks, w, h, bytes_per_block,
 						num_blocks, format, compressionType)) {
-					if (surfaceToCompress &&
-						surfaceToCompress != currentSurface) {
-						SDL_DestroySurface(surfaceToCompress);
-					}
+					this->compressedBlocks = std::move(blocks);
+					this->compressedWidth = w;
+					this->compressedHeight = h;
+					this->compressedBytesPerBlock = bytes_per_block;
+					this->compressedNumBlocks = num_blocks;
+					this->compressedFormat = format;
+					
+				} else {
+					SDL_Log("Failed to compress surface to blocks.");
 					return false;
 				}
 
-				this->compressedBlocks = std::move(blocks);
-				this->compressedWidth = w;
-				this->compressedHeight = h;
-				this->compressedBytesPerBlock = bytes_per_block;
-				this->compressedNumBlocks = num_blocks;
-				this->compressedFormat = format;
-
-				if (!editor.writeBlockstoDDS(
-						this->compressedBlocks, this->compressedWidth,
-						this->compressedHeight, this->compressedBytesPerBlock,
-						this->compressedNumBlocks, this->compressedFormat,
-						outName)) {
-					outputFile = outName;
-					SDL_Log("Compression node wrote DDS: %s",
-							outputFile.c_str());
-				} else {
-					SDL_Log("Compression node failed to write DDS: %s",
-							outName.c_str());
-					outputFile = "";
-				}
-
-				// Try to decode compressed blocks for preview (prefer
-				// compressed preview).
+				
 				SDL_Surface* decoded = nullptr;
 				if (!this->compressedBlocks.empty()) {
 					decoded = editor.decodeBlocksToSurface(
@@ -519,6 +516,44 @@ class Application {
 					}
 
 					texture = SDL_CreateTextureFromSurface(renderer, decoded);
+
+					
+				if (isFinalCompressionNode) {
+						utils::image_u8 img;
+
+						if (!editor.surfaceToImageU8(surfaceToCompress, img)) {
+							SDL_Log("Failed converting surface to image_u8");
+							return false;
+						}
+
+						rdo_bc::rdo_bc_params params;
+
+						params.m_generate_mipmaps = generateMipmapsForExport;
+
+						params.m_dxgi_format = selectedDxgiFormat;
+
+						rdo_bc::rdo_bc_encoder encoder;
+
+						if (!encoder.init(img, params)) return false;
+						if (!encoder.encode()) return false;
+
+						if (utils::save_dds(
+								outName.c_str(), encoder.get_orig_width(),
+								encoder.get_orig_height(),
+								encoder.get_mip_levels(), encoder.get_blocks(),
+								encoder.get_pixel_format_bpp(),
+								encoder.get_pixel_format(), false, true)) {
+							outputFile = outName;
+							SDL_Log("Compression node wrote DDS: %s",
+									outputFile.c_str());
+							return true;
+						} else {
+							SDL_Log("Compression node failed to write DDS: %s",
+									outName.c_str());
+							outputFile = "";
+							return false;
+						}
+					}
 
 					SDL_Surface* nextSurface = SDL_DuplicateSurface(decoded);
 					if (!nextSurface) {
@@ -589,12 +624,12 @@ class Application {
 
 		Node* findUpstreamNode(Node& targetNode) const {
 			if (targetNode.inputs.empty()) {
-				SDL_Log("findUpstreamNode: target node %lu has no inputs",
+				SDL_Log("findUpstreamNode: target node %zu has no inputs",
 						targetNode.id.Get());
 				return nullptr;
 			}
 
-			SDL_Log("findUpstreamNode: target node %lu has %d input pins",
+			SDL_Log("findUpstreamNode: target node %zu has %zu input pins",
 					targetNode.id.Get(), targetNode.inputs.size());
 
 			// Search all input pins for an incoming link.
@@ -609,14 +644,14 @@ class Application {
 						Node* owner = findNodeOwningPin(link.startPin);
 						if (owner) {
 							SDL_Log(
-								"findUpstreamNode: found upstream node %lu via "
-								"link %lu",
-								owner->id.Get(), link.id.Get());
+								"findUpstreamNode: found upstream node %d via "
+								"link %d",
+								(int)owner->id.Get(), (int)link.id.Get());
 						} else {
 							SDL_Log(
-								"findUpstreamNode: found link %lu but owner "
-								"not found for startPin %lu",
-								link.id.Get(), link.startPin.Get());
+								"findUpstreamNode: found link %d but owner "
+								"not found for startPin %d",
+								(int)link.id.Get(), (int)link.startPin.Get());
 						}
 						return owner;
 					}
@@ -835,117 +870,6 @@ class Application {
 			}
 		}
 
-		bool writeBlockstoDDS(std::vector<char> blocks, int w, int h,
-							  int bytes_per_block, int num_blocks, int format,
-							  const std::string& outputFile) {
-			size_t totalBytes = blocks.size();
-			if (totalBytes == 0) {
-				SDL_Log("compressBlockstoDDS: no compressed data to write");
-				return false;
-			}
-
-			// Write DDS with DX10 header so modern tools correctly interpret
-			// the DXGI format and resource dimension.
-			struct DDS_PIXELFORMAT {
-				uint32_t dwSize;
-				uint32_t dwFlags;
-				uint32_t dwFourCC;
-				uint32_t dwRGBBitCount;
-				uint32_t dwRBitMask;
-				uint32_t dwGBitMask;
-				uint32_t dwBBitMask;
-				uint32_t dwABitMask;
-			};
-
-			struct DDS_HEADER {
-				uint32_t dwSize;
-				uint32_t dwFlags;
-				uint32_t dwHeight;
-				uint32_t dwWidth;
-				uint32_t dwPitchOrLinearSize;
-				uint32_t dwDepth;
-				uint32_t dwMipMapCount;
-				uint32_t dwReserved1[11];
-				DDS_PIXELFORMAT ddspf;
-				uint32_t dwCaps;
-				uint32_t dwCaps2;
-				uint32_t dwCaps3;
-				uint32_t dwCaps4;
-				uint32_t dwReserved2;
-			};
-
-			struct DDS_HEADER_DX10 {
-				uint32_t dxgiFormat;
-				uint32_t resourceDimension;
-				uint32_t miscFlag;
-				uint32_t arraySize;
-				uint32_t miscFlags2;
-			};
-
-			// DDS constants
-			constexpr uint32_t DDSD_CAPS = 0x1;
-			constexpr uint32_t DDSD_HEIGHT = 0x2;
-			constexpr uint32_t DDSD_WIDTH = 0x4;
-			constexpr uint32_t DDSD_PIXELFORMAT = 0x1000;
-			constexpr uint32_t DDSD_LINEARSIZE = 0x80000;
-			constexpr uint32_t DDPF_FOURCC = 0x4;
-			constexpr uint32_t DDSCAPS_TEXTURE = 0x1000;
-
-			DDS_HEADER header{};
-			header.dwSize = 124;
-			header.dwFlags = DDSD_CAPS | DDSD_HEIGHT | DDSD_WIDTH |
-							 DDSD_PIXELFORMAT | DDSD_LINEARSIZE;
-			header.dwHeight = static_cast<uint32_t>(h);
-			header.dwWidth = static_cast<uint32_t>(w);
-			header.dwPitchOrLinearSize = static_cast<uint32_t>(totalBytes);
-			header.dwDepth = 0;
-			header.dwMipMapCount = 0;
-			// ddspf
-			header.ddspf.dwSize = 32;
-			header.ddspf.dwFlags = DDPF_FOURCC;
-			// FourCC 'DX10' signals presence of DDS_HEADER_DX10
-			header.ddspf.dwFourCC =
-				(uint32_t)('D' | ('X' << 8) | ('1' << 16) | ('0' << 24));
-			header.ddspf.dwRGBBitCount = 0;
-			header.ddspf.dwRBitMask = 0;
-			header.ddspf.dwGBitMask = 0;
-			header.ddspf.dwBBitMask = 0;
-			header.ddspf.dwABitMask = 0;
-			header.dwCaps = DDSCAPS_TEXTURE;
-			header.dwCaps2 = 0;
-			header.dwCaps3 = 0;
-			header.dwCaps4 = 0;
-			header.dwReserved2 = 0;
-
-			DDS_HEADER_DX10 dx10{};
-			dx10.dxgiFormat = static_cast<uint32_t>(format);
-			dx10.resourceDimension = 3;	 // D3D10_RESOURCE_DIMENSION_TEXTURE2D
-			dx10.miscFlag = 0;
-			dx10.arraySize = 1;
-			dx10.miscFlags2 = 0;
-
-			std::ofstream ofs(outputFile, std::ios::binary);
-			if (!ofs) {
-				SDL_Log("compressBlockstoDDS: failed to open output file: %s",
-						outputFile.c_str());
-				return false;
-			}
-
-			// Write magic
-			ofs.write("DDS ", 4);
-			// Write header
-			ofs.write(reinterpret_cast<const char*>(&header), sizeof(header));
-			// Write DX10 header
-			ofs.write(reinterpret_cast<const char*>(&dx10), sizeof(dx10));
-			// Write block data
-			ofs.write(blocks.data(), static_cast<std::streamsize>(totalBytes));
-			ofs.close();
-
-			SDL_Log("compressBlockstoDDS: wrote %zu bytes to %s", totalBytes,
-					outputFile.c_str());
-			return true;
-		}
-
 		void cleanup() const { NodeImGui::DestroyEditor(nodeContext); }
 
 		void render(Application* a) {
@@ -1020,9 +944,9 @@ class Application {
 								graphEdges.push_back(edge);
 								links.push_back(link);
 
-								SDL_Log("Created link id=%lu start=%lu end=%lu",
-										link.id.Get(), link.startPin.Get(),
-										link.endPin.Get());
+								SDL_Log("Created link id=%d start=%d end=%d",
+										(int)link.id.Get(), (int)link.startPin.Get(),
+										(int)link.endPin.Get());
 							} else if (firstIsInput && secondIsOutput) {
 								link.startPin = secondPin;
 								link.endPin = firstPin;
@@ -1032,9 +956,9 @@ class Application {
 								edge.destination = firstNode;
 								graphEdges.push_back(edge);
 								links.push_back(link);
-								SDL_Log("Created link id=%lu start=%lu end=%lu",
-										link.id.Get(), link.startPin.Get(),
-										link.endPin.Get());
+								SDL_Log("Created link id=%d start=%d end=%d",
+										(int)link.id.Get(), (int)link.startPin.Get(),
+										(int)link.endPin.Get());
 							}
 						}
 					}
@@ -1114,7 +1038,7 @@ class Application {
 		// `sourceFile` to the current file, call its `process` method and
 		// advance the current file to the node's `outputFile` if it was set.
 		bool processPath(const std::vector<Node*>& path,
-						 SDL_Renderer* renderer, Application* app) {
+						 SDL_Renderer* renderer, Application* app, bool generateMipmaps) {
 			if (path.empty()) {
 				SDL_Log("processPath: empty path");
 				return false;
@@ -1127,6 +1051,10 @@ class Application {
 				return false;
 			}
 
+			// Put mipmap finding somewhere here, maybe as a separate pass
+			// before processing the path, to set a flag on each node whether it
+			// needs to generate mipmaps or not.
+
 			// Initialize currentSurface from the input node if available,
 			// otherwise try to load from disk.
 			SDL_Surface* currentSurface = nullptr;
@@ -1137,6 +1065,19 @@ class Application {
 				currentSurface = IMG_Load(inputNode->sourceFile.c_str());
 			}
 
+			CompressionNode* lastCompressionNode = nullptr;
+
+			if (generateMipmaps) {
+			SDL_Log("processPath: mipmap generation enabled");
+			}
+				for (Node* node : path) {
+					if (auto* compression = dynamic_cast<CompressionNode*>(node)) {
+						lastCompressionNode = compression;
+						
+					}
+				}
+			
+
 			// Iterate nodes after the input node and feed the currentSurface
 			// through
 			for (size_t i = 1; i < path.size(); ++i) {
@@ -1146,13 +1087,20 @@ class Application {
 					if (currentSurface) SDL_DestroySurface(currentSurface);
 					return false;
 				}
-				SDL_Log("processPath: running %s (ID: %lu)", node->name(),
-						node->id.Get());
+				SDL_Log("processPath: running %s (ID: %d)", node->name(),
+						(int)node->id.Get());
+				if (auto* compression = dynamic_cast<CompressionNode*>(node)) {
+					compression->isFinalCompressionNode =
+						compression == lastCompressionNode;
+
+					compression->generateMipmapsForExport =
+						generateMipmaps && compression == lastCompressionNode;
+				}
 				if (!node->process(*this, renderer, path[i - 1],
 								   currentSurface, app)) {
 					SDL_Log(
-						"processPath: node processing failed for %s (ID: %lu)",
-						node->name(), node->id.Get());
+						"processPath: node processing failed for %s (ID: %d)",
+						node->name(), (int)node->id.Get());
 					if (currentSurface) SDL_DestroySurface(currentSurface);
 					return false;
 				}
@@ -1164,6 +1112,38 @@ class Application {
 			}
 
 			SDL_Log("processPath: finished");
+			return true;
+		}
+
+
+		static bool surfaceToImageU8(SDL_Surface* src, utils::image_u8& dst) {
+			if (!src) return false;
+
+			SDL_Surface* rgba = SDL_ConvertSurface(src, SDL_PIXELFORMAT_RGBA32);
+
+			if (!rgba) return false;
+
+			dst.init(rgba->w, rgba->h);
+
+			uint8_t* pixels = static_cast<uint8_t*>(rgba->pixels);
+
+			for (int y = 0; y < rgba->h; ++y) {
+				for (int x = 0; x < rgba->w; ++x) {
+					uint8_t* p = pixels + y * rgba->pitch + x * 4;
+
+					utils::color_quad_u8 c;
+
+					c.r = p[0];
+					c.g = p[1];
+					c.b = p[2];
+					c.a = p[3];
+
+					dst(x, y) = c;
+				}
+			}
+
+			SDL_DestroySurface(rgba);
+
 			return true;
 		}
 
