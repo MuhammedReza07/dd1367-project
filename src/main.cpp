@@ -267,6 +267,8 @@ class Application {
 					SDL_DestroyTexture(texture);
 					texture = nullptr;
 				}
+				sourceFile = inputNode->sourceFile;
+				outputFile.clear();
 
 				texture =
 					SDL_CreateTextureFromSurface(renderer, currentSurface);
@@ -399,7 +401,7 @@ class Application {
 					return false;
 				}
 
-				if (currentSurface) {
+				if (currentSurface && currentSurface != inputNode->surface) {
 					SDL_DestroySurface(currentSurface);
 				}
 
@@ -450,6 +452,16 @@ class Application {
 				const int h =
 					r ? r->h : (g ? g->h : (b ? b->h : (a ? a->h : 1)));
 
+				auto sameSize = [w, h](SDL_Surface* s) {
+					return !s || (s->w == w && s->h == h);
+				};
+
+				if (!sameSize(r) || !sameSize(g) || !sameSize(b) ||
+					!sameSize(a)) {
+					SDL_Log("RGBA channels must have matching dimensions.");
+					return nullptr;
+				}
+
 				SDL_Surface* rr = convertToRGBA32(r);
 				SDL_Surface* gg = convertToRGBA32(g);
 				SDL_Surface* bb = convertToRGBA32(b);
@@ -476,6 +488,11 @@ class Application {
 						p[3] = av;
 					}
 				}
+
+				SDL_DestroySurface(rr);
+				SDL_DestroySurface(gg);
+				SDL_DestroySurface(bb);
+				SDL_DestroySurface(aa);
 
 				return result;
 			}
@@ -839,7 +856,7 @@ class Application {
 
 					std::string fname = path.stem().string();
 					fs::path outPath = fs::path(selected_folder) /
-									   (fname + "_processed.png");
+									   (fname + "_processed.dds");
 					outName = outPath.string();
 				}
 
