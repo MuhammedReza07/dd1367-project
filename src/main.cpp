@@ -17,15 +17,14 @@
 
 #include <algorithm>
 #include <array>
-#include <cstddef>
+#include <filesystem>
 #include <fstream>
 #include <memory>
 #include <stack>
 #include <string>
-#include <unordered_set>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
-#include <filesystem>
 namespace fs = std::filesystem;
 namespace NodeImGui = ax::NodeEditor;
 
@@ -175,7 +174,8 @@ class Application {
 				outputSurfaces.clear();
 			}
 
-			PinDataKind getOutputKind(NodeImGui::PinId pin) const {
+			[[nodiscard]] PinDataKind getOutputKind(
+				const NodeImGui::PinId pin) const {
 				auto it = outputPinKinds.find(pin.Get());
 
 				if (it != outputPinKinds.end()) {
@@ -226,9 +226,12 @@ class Application {
 			NodeImGui::PinId blueOutput;
 			NodeImGui::PinId alphaOutput;
 
-			const char* name() const override { return "RGBA Split"; }
+			[[nodiscard]] const char* name() const override {
+				return "RGBA Split";
+			}
 
-			const char* getOutputLabel(NodeImGui::PinId pin) const override {
+			[[nodiscard]] const char* getOutputLabel(
+				const NodeImGui::PinId pin) const override {
 				if (pin == redOutput) return "R";
 				if (pin == greenOutput) return "G";
 				if (pin == blueOutput) return "B";
@@ -280,11 +283,12 @@ class Application {
 				return true;
 			}
 
-			private:
+		   private:
 			static SDL_Surface* makeChannelSurface(const utils::image_u8& img,
-												   PinDataKind channel) {
-				SDL_Surface* out = SDL_CreateSurface(
-					img.width(), img.height(), SDL_PIXELFORMAT_RGBA32);
+												   const PinDataKind channel) {
+				SDL_Surface* out =
+					SDL_CreateSurface(img.width(), img.height(),  // NOLINT
+									  SDL_PIXELFORMAT_RGBA32);
 
 				if (!out) {
 					SDL_Log("Failed creating channel surface: %s",
@@ -292,7 +296,7 @@ class Application {
 					return nullptr;
 				}
 
-				uint8_t* dst = static_cast<uint8_t*>(out->pixels);
+				auto* dst = static_cast<uint8_t*>(out->pixels);
 
 				for (uint32_t y = 0; y < img.height(); ++y) {
 					for (uint32_t x = 0; x < img.width(); ++x) {
@@ -318,7 +322,8 @@ class Application {
 								break;
 						}
 
-						uint8_t* p = dst + y * out->pitch + x * 4;
+						uint8_t* p = dst + static_cast<size_t>(y * out->pitch) +
+									 static_cast<size_t>(x * 4);
 
 						p[0] = v;
 						p[1] = v;
@@ -331,14 +336,15 @@ class Application {
 			}
 		};
 
-		SDL_Surface* getLinkedSurfaceForInput(NodeImGui::PinId inputPin) const {
+		[[nodiscard]] SDL_Surface* getLinkedSurfaceForInput(
+			const NodeImGui::PinId inputPin) const {
 			for (const auto& link : links) {
 				if (link.endPin == inputPin) {
 					Node* upstream = findNodeOwningPin(link.startPin);
 
 					if (!upstream) return nullptr;
 
-					auto it =
+					const auto it =
 						upstream->outputSurfaces.find(link.startPin.Get());
 
 					if (it != upstream->outputSurfaces.end()) {
@@ -364,9 +370,12 @@ class Application {
 			NodeImGui::PinId alphaInput;
 			NodeImGui::PinId imageOutput;
 
-			const char* name() const override { return "RGBA -> New Surface"; }
+			[[nodiscard]] const char* name() const override {
+				return "RGBA -> New Surface";
+			}
 
-			const char* getInputLabel(NodeImGui::PinId pin) const override {
+			[[nodiscard]] const char* getInputLabel(
+				const NodeImGui::PinId pin) const override {
 				if (pin == redInput) return "R";
 				if (pin == greenInput) return "G";
 				if (pin == blueInput) return "B";
@@ -375,7 +384,8 @@ class Application {
 				return "In";
 			}
 
-			const char* getOutputLabel(NodeImGui::PinId pin) const override {
+			[[nodiscard]] const char* getOutputLabel(
+				const NodeImGui::PinId pin) const override {
 				if (pin == imageOutput) return "RGBA";
 
 				return "Out";
@@ -388,16 +398,7 @@ class Application {
 				SDL_Surface* g = editor.getLinkedSurfaceForInput(greenInput);
 				SDL_Surface* b = editor.getLinkedSurfaceForInput(blueInput);
 				SDL_Surface* a = editor.getLinkedSurfaceForInput(alphaInput);
-				
-				/*
-				if (!r && !g && !b) {
-					SDL_Log(
-						"RGBA -> New Texture requires at least one R/G/B "
-						"inputs.");
-					return false;
-				}
-				*/
-				
+
 				SDL_Surface* result = combineChannels(r, g, b, a);
 
 				if (!result) {
@@ -419,19 +420,19 @@ class Application {
 				texture =
 					SDL_CreateTextureFromSurface(renderer, currentSurface);
 
-
 				sourceFile = inputNode->sourceFile;
 				outputFile.clear();	 // Clear output file since this is an
 									 // intermediate node
-
 
 				return true;
 			}
 
 		   private:
-			static uint8_t readGray(SDL_Surface* surface, int x, int y) {
-				uint8_t* pixels = static_cast<uint8_t*>(surface->pixels);
-				uint8_t* p = pixels + y * surface->pitch + x * 4;
+			static uint8_t readGray(const SDL_Surface* surface, int x, int y) {
+				const auto* pixels = static_cast<uint8_t*>(surface->pixels);
+				const uint8_t* p = pixels +
+								   static_cast<ptrdiff_t>(y * surface->pitch) +
+								   static_cast<ptrdiff_t>(x * 4);
 				return p[0];
 			}
 
@@ -449,7 +450,6 @@ class Application {
 			static SDL_Surface* combineChannels(SDL_Surface* r, SDL_Surface* g,
 												SDL_Surface* b,
 												SDL_Surface* a) {
-
 				const int w =
 					r ? r->w : (g ? g->w : (b ? b->w : (a ? a->w : 1)));
 
@@ -477,14 +477,15 @@ class Application {
 
 				for (int y = 0; y < h; ++y) {
 					for (int x = 0; x < w; ++x) {
-						uint8_t rv = rr ? readGray(rr, x, y) : 0;
-						uint8_t gv = gg ? readGray(gg, x, y) : 0;
-						uint8_t bv = bb ? readGray(bb, x, y) : 0;
-						uint8_t av = aa ? readGray(aa, x, y) : 255;
-						
+						const uint8_t rv = rr ? readGray(rr, x, y) : 0;
+						const uint8_t gv = gg ? readGray(gg, x, y) : 0;
+						const uint8_t bv = bb ? readGray(bb, x, y) : 0;
+						const uint8_t av = aa ? readGray(aa, x, y) : 255;
 
-						uint8_t* pixels = static_cast<uint8_t*>(result->pixels);
-						uint8_t* p = pixels + y * result->pitch + x * 4;
+						auto* pixels = static_cast<uint8_t*>(result->pixels);
+						uint8_t* p = pixels +
+									 static_cast<ptrdiff_t>(y * result->pitch) +
+									 static_cast<ptrdiff_t>(x * 4);
 
 						p[0] = rv;
 						p[1] = gv;
@@ -536,9 +537,9 @@ class Application {
 						}
 
 						sourceFile = selected_files.back();
-						fs::path path(sourceFile);
+						const fs::path path(sourceFile);
 						filename = path.filename().string();
-						
+
 						if (selected_files.size() > 1) {
 							original_textures.pop_back();
 							selected_files.pop_back();
@@ -556,8 +557,8 @@ class Application {
 					SDL_GetTextureSize(texture, &width, &height);
 
 					const float maxWidth =
-						150.0f / width;  // Scale down if texture is wider than
-										  // 150 pixels
+						150.0f / width;	 // Scale down if texture is wider than
+										 // 150 pixels
 					const float scaleFactor = std::min(maxWidth, 1.0f);
 
 					const ImVec2 scaledSize(width * scaleFactor,
@@ -573,8 +574,8 @@ class Application {
 			std::vector<Node*> processingPath;
 			Node* inputNode = nullptr;
 			bool fallbackToDisk = false;
-			bool generateMipmaps = false;
-			bool outputfileSet = false;
+			bool generateMipmaps = false;  // Remove?
+			bool outputfileSet = false;	   // Remove?
 
 		   public:
 			OutputNode() { this->containsImage = false; }
@@ -583,7 +584,6 @@ class Application {
 			}
 
 			void renderBody(Application* app, NodeEditor& editor) override {
-		
 				if (selected_folder.empty()) {
 					if (ImGui::Button("Select folder")) {
 						SDL_ShowOpenFolderDialog(folder_callback, nullptr,
@@ -609,8 +609,8 @@ class Application {
 				}
 
 				if (!outputFile.empty()) {
-					fs::path outputText(outputFile);
-					std::string filename = outputText.filename().string();
+					const fs::path outputText(outputFile);
+					const std::string filename = outputText.filename().string();
 					ImGui::Text("Output: %s", filename.c_str());
 				}
 
@@ -619,7 +619,7 @@ class Application {
 					SDL_GetTextureSize(texture, &width, &height);
 
 					const float maxWidth =	// Scale down if texture is wider
-						150.0f / width;	// than 150 pixels
+						150.0f / width;		// than 150 pixels
 
 					const float scaleFactor = std::min(maxWidth, 1.0f);
 
@@ -659,15 +659,16 @@ class Application {
 					fallbackToDisk = true;
 				}
 
-				if (fileWritten = false) {
+				if (!fileWritten) {
 					std::string outName;
 					if (!inputNode->sourceFile.empty()) {
 						// Strip path and extension from sourceFile
 						const std::string& src = inputNode->sourceFile;
-						fs::path path(src);
-						
-						std::string fname = path.stem().string();
-						fs::path outPath = fs::path(selected_folder)/(fname + "_processed.png");
+						const fs::path path(src);
+
+						const std::string fname = path.stem().string();
+						const fs::path outPath = fs::path(selected_folder) /
+												 (fname + "_processed.png");
 						outName = outPath.string();
 
 						utils::image_u8 img;
@@ -695,7 +696,7 @@ class Application {
 						return false;
 					}
 				}
-				//sourceFile = previousNode->sourceFile;
+				// sourceFile = previousNode->sourceFile;
 				outputFile = previousNode->outputFile;
 
 				SDL_Log("Output node received file: %s", outputFile.c_str());
@@ -775,7 +776,6 @@ class Application {
 			}
 
 			void renderBody(Application* app, NodeEditor& editor) override {
-
 				switch (compressionType) {
 					case CompressionType::BC7:
 						ImGui::Text("Compression: BC7");
@@ -866,8 +866,8 @@ class Application {
 					fs::path path(src);
 
 					std::string fname = path.stem().string();
-					fs::path outPath = fs::path(selected_folder) /
-									   (fname + "_processed.dds");
+					fs::path outPath =
+						fs::path(selected_folder) / (fname + "_processed.dds");
 					outName = outPath.string();
 				}
 
@@ -925,13 +925,10 @@ class Application {
 						if (nowSRGB) {
 							params.m_mipmap_method =
 								utils::mipmap_generation_method_sRGBBox;
-						} else{
-
+						} else {
 							params.m_mipmap_method =
 								utils::mipmap_generation_method_LinearBox;
 						}
-
-						
 
 						rdo_bc::rdo_bc_encoder encoder;
 
@@ -972,8 +969,8 @@ class Application {
 
 					currentSurface = nextSurface;
 
-					//sourceFile = inputNode->sourceFile;
-					//outputFile = outName;
+					// sourceFile = inputNode->sourceFile;
+					// outputFile = outName;
 
 					SDL_DestroySurface(decoded);
 				}
@@ -1275,8 +1272,6 @@ class Application {
 			}
 		}
 
-		
-
 		void cleanup() const { NodeImGui::DestroyEditor(nodeContext); }
 
 		void render(Application* a) {
@@ -1303,7 +1298,6 @@ class Application {
 					NodeImGui::BeginPin(outputPin, NodeImGui::PinKind::Output);
 					ImGui::Text("-> %s", node->getOutputLabel(outputPin));
 					NodeImGui::EndPin();
-					
 				}
 
 				ImGui::PopID();
@@ -1472,11 +1466,11 @@ class Application {
 				currentSurface = IMG_Load(inputNode->sourceFile.c_str());
 			}
 
-			CompressionNode* lastCompressionNode = nullptr;
+			const CompressionNode* lastCompressionNode = nullptr;
 
-			
 			for (Node* node : path) {
-				if (auto* compression = dynamic_cast<CompressionNode*>(node)) {
+				if (const auto* compression =
+						dynamic_cast<CompressionNode*>(node)) {
 					lastCompressionNode = compression;
 				}
 			}
@@ -1495,8 +1489,6 @@ class Application {
 				if (auto* compression = dynamic_cast<CompressionNode*>(node)) {
 					compression->isFinalCompressionNode =
 						compression == lastCompressionNode;
-
-					
 				}
 				if (!node->process(*this, renderer, path[i - 1], currentSurface,
 								   app)) {
@@ -1776,63 +1768,63 @@ class Application {
 	}
 
 	void CreateRGBASplitNode() {
-    auto node = std::make_unique<NodeEditor::RGBASplitNode>();
+		auto node = std::make_unique<NodeEditor::RGBASplitNode>();
 
-    node->id = nodeEditor.getUniqueId();
+		node->id = nodeEditor.getUniqueId();
 
-    node->inputs.push_back(nodeEditor.getUniquePinId());
+		node->inputs.push_back(nodeEditor.getUniquePinId());
 
-    node->redOutput = nodeEditor.getUniquePinId();
-    node->greenOutput = nodeEditor.getUniquePinId();
-    node->blueOutput = nodeEditor.getUniquePinId();
-    node->alphaOutput = nodeEditor.getUniquePinId();
+		node->redOutput = nodeEditor.getUniquePinId();
+		node->greenOutput = nodeEditor.getUniquePinId();
+		node->blueOutput = nodeEditor.getUniquePinId();
+		node->alphaOutput = nodeEditor.getUniquePinId();
 
-    node->outputs.push_back(node->redOutput);
-    node->outputs.push_back(node->greenOutput);
-    node->outputs.push_back(node->blueOutput);
-    node->outputs.push_back(node->alphaOutput);
+		node->outputs.push_back(node->redOutput);
+		node->outputs.push_back(node->greenOutput);
+		node->outputs.push_back(node->blueOutput);
+		node->outputs.push_back(node->alphaOutput);
 
-    node->outputPinKinds[node->redOutput.Get()] =
-		NodeEditor::Node::PinDataKind::Red;
+		node->outputPinKinds[node->redOutput.Get()] =
+			NodeEditor::Node::PinDataKind::Red;
 
-	node->outputPinKinds[node->greenOutput.Get()] =
-		NodeEditor::Node::PinDataKind::Green;
+		node->outputPinKinds[node->greenOutput.Get()] =
+			NodeEditor::Node::PinDataKind::Green;
 
-	node->outputPinKinds[node->blueOutput.Get()] =
-		NodeEditor::Node::PinDataKind::Blue;
+		node->outputPinKinds[node->blueOutput.Get()] =
+			NodeEditor::Node::PinDataKind::Blue;
 
-	node->outputPinKinds[node->alphaOutput.Get()] =
-		NodeEditor::Node::PinDataKind::Alpha;
+		node->outputPinKinds[node->alphaOutput.Get()] =
+			NodeEditor::Node::PinDataKind::Alpha;
 
-	const ImVec2 center = ImGui::GetMainViewport()->GetCenter();
-	NodeImGui::SetNodePosition(node->id, ImVec2(center.x, center.y));
+		const ImVec2 center = ImGui::GetMainViewport()->GetCenter();
+		NodeImGui::SetNodePosition(node->id, ImVec2(center.x, center.y));
 
-    nodeEditor.addNode(std::move(node));
-}
+		nodeEditor.addNode(std::move(node));
+	}
 
 	void CreateRGBAToNewSurfaceNode() {
-	auto node = std::make_unique<NodeEditor::RGBAToNewSurfaceNode>();
+		auto node = std::make_unique<NodeEditor::RGBAToNewSurfaceNode>();
 
-	node->id = nodeEditor.getUniqueId();
+		node->id = nodeEditor.getUniqueId();
 
-	node->redInput = nodeEditor.getUniquePinId();
-	node->greenInput = nodeEditor.getUniquePinId();
-	node->blueInput = nodeEditor.getUniquePinId();
-	node->alphaInput = nodeEditor.getUniquePinId();
+		node->redInput = nodeEditor.getUniquePinId();
+		node->greenInput = nodeEditor.getUniquePinId();
+		node->blueInput = nodeEditor.getUniquePinId();
+		node->alphaInput = nodeEditor.getUniquePinId();
 
-	node->inputs.push_back(node->redInput);
-	node->inputs.push_back(node->greenInput);
-	node->inputs.push_back(node->blueInput);
-	node->inputs.push_back(node->alphaInput);
+		node->inputs.push_back(node->redInput);
+		node->inputs.push_back(node->greenInput);
+		node->inputs.push_back(node->blueInput);
+		node->inputs.push_back(node->alphaInput);
 
-	node->imageOutput = nodeEditor.getUniquePinId();
-	node->outputs.push_back(node->imageOutput);
+		node->imageOutput = nodeEditor.getUniquePinId();
+		node->outputs.push_back(node->imageOutput);
 
-	const ImVec2 center = ImGui::GetMainViewport()->GetCenter();
-	NodeImGui::SetNodePosition(node->id, ImVec2(center.x, center.y));
+		const ImVec2 center = ImGui::GetMainViewport()->GetCenter();
+		NodeImGui::SetNodePosition(node->id, ImVec2(center.x, center.y));
 
-	nodeEditor.addNode(std::move(node));
-}
+		nodeEditor.addNode(std::move(node));
+	}
 
 	static void HelpMarker(const char* desc) {
 		ImGui::TextDisabled("(?)");
