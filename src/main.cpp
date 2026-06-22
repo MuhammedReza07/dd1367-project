@@ -132,6 +132,7 @@ class Application {
 			SDL_Surface* surface = nullptr;
 			std::string sourceFile;
 			std::string outputFile;
+			bool fileWritten = false;
 			// Compressed data produced by compression nodes (raw block data).
 			std::vector<char> compressedBlocks;
 			int compressedWidth = 0;
@@ -538,9 +539,10 @@ class Application {
 						fs::path path(sourceFile);
 						filename = path.filename().string();
 						
-
-						original_textures.pop_back();
-						selected_files.pop_back();
+						if (selected_files.size() > 1) {
+							original_textures.pop_back();
+							selected_files.pop_back();
+						}
 						this->containsImage = false;
 					}
 				}
@@ -581,7 +583,7 @@ class Application {
 			}
 
 			void renderBody(Application* app, NodeEditor& editor) override {
-				ImGui::Checkbox("Generate mipmaps", &generateMipmaps);
+		
 				if (selected_folder.empty()) {
 					if (ImGui::Button("Select folder")) {
 						SDL_ShowOpenFolderDialog(folder_callback, nullptr,
@@ -594,13 +596,13 @@ class Application {
 					if (!processingPath.empty()) {
 						inputNode = processingPath.front();
 						sourceFile = inputNode->sourceFile;
+						fileWritten = false;
 
 						SDL_Log("Found path with %lu nodes:",
 								processingPath.size());
 						SDL_Log("Input node: %s (ID: %lu)", inputNode->name(),
 								inputNode->id.Get());
-						editor.processPath(processingPath, app->renderer, app,
-										   generateMipmaps);
+						editor.processPath(processingPath, app->renderer, app);
 					} else {
 						SDL_Log("No path found");
 					}
@@ -657,7 +659,7 @@ class Application {
 					fallbackToDisk = true;
 				}
 
-				if (outputFile.empty()) {
+				if (fileWritten = false) {
 					std::string outName;
 					if (!inputNode->sourceFile.empty()) {
 						// Strip path and extension from sourceFile
@@ -762,6 +764,7 @@ class Application {
 		   public:
 			bool isFinalCompressionNode = false;
 			bool generateMipmapsForExport = false;
+			bool isSRGB = false;
 
 			enum class CompressionType { BC7, BC5, BC4, BC3, BC2, BC1 };
 
@@ -772,6 +775,7 @@ class Application {
 			}
 
 			void renderBody(Application* app, NodeEditor& editor) override {
+
 				switch (compressionType) {
 					case CompressionType::BC7:
 						ImGui::Text("Compression: BC7");
@@ -792,6 +796,9 @@ class Application {
 						ImGui::Text("Compression: BC1");
 						break;
 				}
+
+				ImGui::Checkbox("Generate mipmaps", &generateMipmapsForExport);
+				ImGui::Checkbox("SRGB", &isSRGB);
 			}
 
 			bool process(NodeEditor& editor, SDL_Renderer* renderer,
@@ -801,6 +808,8 @@ class Application {
 					SDL_Log("Compression node has no input.");
 					return false;
 				}
+
+				outputFile.clear();
 
 				// If we have an in-memory surface from upstream, prefer that.
 				SDL_Surface* surfaceToCompress = currentSurface;
@@ -911,6 +920,19 @@ class Application {
 
 						params.m_dxgi_format = selectedDxgiFormat;
 
+						bool nowSRGB = isSRGB;
+
+						if (nowSRGB) {
+							params.m_mipmap_method =
+								utils::mipmap_generation_method_sRGBBox;
+						} else{
+
+							params.m_mipmap_method =
+								utils::mipmap_generation_method_LinearBox;
+						}
+
+						
+
 						rdo_bc::rdo_bc_encoder encoder;
 
 						if (!encoder.init(img, params)) return false;
@@ -921,15 +943,17 @@ class Application {
 								encoder.get_orig_height(),
 								encoder.get_mip_levels(), encoder.get_blocks(),
 								encoder.get_pixel_format_bpp(),
-								encoder.get_pixel_format(), false, true)) {
+								encoder.get_pixel_format(), nowSRGB, true)) {
 							outputFile = outName;
 							SDL_Log("Compression node wrote DDS: %s",
 									outputFile.c_str());
+							fileWritten = true;
 							return true;
 						} else {
 							SDL_Log("Compression node failed to write DDS: %s",
 									outName.c_str());
-							outputFile = "";
+							outputFile.clear();
+							fileWritten = false;
 							return false;
 						}
 					}
@@ -949,7 +973,7 @@ class Application {
 					currentSurface = nextSurface;
 
 					//sourceFile = inputNode->sourceFile;
-					outputFile = outName;
+					//outputFile = outName;
 
 					SDL_DestroySurface(decoded);
 				}
@@ -1421,7 +1445,7 @@ class Application {
 		// `sourceFile` to the current file, call its `process` method and
 		// advance the current file to the node's `outputFile` if it was set.
 		bool processPath(const std::vector<Node*>& path, SDL_Renderer* renderer,
-						 Application* app, const bool generateMipmaps) {
+						 Application* app) {
 			if (path.empty()) {
 				SDL_Log("processPath: empty path");
 				return false;
@@ -1450,9 +1474,7 @@ class Application {
 
 			CompressionNode* lastCompressionNode = nullptr;
 
-			if (generateMipmaps) {
-				SDL_Log("processPath: mipmap generation enabled");
-			}
+			
 			for (Node* node : path) {
 				if (auto* compression = dynamic_cast<CompressionNode*>(node)) {
 					lastCompressionNode = compression;
@@ -1474,8 +1496,7 @@ class Application {
 					compression->isFinalCompressionNode =
 						compression == lastCompressionNode;
 
-					compression->generateMipmapsForExport =
-						generateMipmaps && compression == lastCompressionNode;
+					
 				}
 				if (!node->process(*this, renderer, path[i - 1], currentSurface,
 								   app)) {
