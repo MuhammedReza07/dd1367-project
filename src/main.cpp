@@ -17,14 +17,15 @@
 
 #include <algorithm>
 #include <array>
-#include <cstddef>
+#include <filesystem>
 #include <fstream>
 #include <memory>
 #include <stack>
 #include <string>
+#include <unordered_map>
 #include <unordered_set>
 #include <vector>
-
+namespace fs = std::filesystem;
 namespace NodeImGui = ax::NodeEditor;
 
 // Enumeration of possible status values for the application.
@@ -58,7 +59,6 @@ static void SDLCALL load_callback(void* userdata, const char* const* filelist,
 		SDL_Log("Most likely, the dialog was canceled.");
 		return;
 	}
-
 	while (*filelist) {
 		SDL_Log("Full path to selected file: '%s'", *filelist);
 		std::string filepath =
@@ -131,6 +131,7 @@ class Application {
 			SDL_Surface* surface = nullptr;
 			std::string sourceFile;
 			std::string outputFile;
+			bool fileWritten = false;
 			// Compressed data produced by compression nodes (raw block data).
 			std::vector<char> compressedBlocks;
 			int compressedWidth = 0;
@@ -141,9 +142,60 @@ class Application {
 			bool isInputNode = false;
 			bool isOutputNode = false;
 
-			virtual ~Node() = default;
+			virtual ~Node() {
+				clearOutputSurfaces();
+
+				if (texture) {
+					SDL_DestroyTexture(texture);
+				}
+
+				if (surface) {
+					SDL_DestroySurface(surface);
+				}
+			}
+
+			enum class PinDataKind { Image, Red, Green, Blue, Alpha };
+
+			struct PinInfo {
+				NodeImGui::PinId id;
+				PinDataKind kind;
+			};
+
+			std::unordered_map<uintptr_t, SDL_Surface*> outputSurfaces;
+			std::unordered_map<uintptr_t, PinDataKind> outputPinKinds;
+
+			void clearOutputSurfaces() {
+				for (auto& [_, surface] : outputSurfaces) {
+					if (surface) {
+						SDL_DestroySurface(surface);
+					}
+				}
+
+				outputSurfaces.clear();
+			}
+
+			[[nodiscard]] PinDataKind getOutputKind(
+				const NodeImGui::PinId pin) const {
+				auto it = outputPinKinds.find(pin.Get());
+
+				if (it != outputPinKinds.end()) {
+					return it->second;
+				}
+
+				return PinDataKind::Image;
+			}
 
 			[[nodiscard]] virtual const char* name() const { return "Node"; }
+
+			[[nodiscard]] virtual const char* getInputLabel(
+				NodeImGui::PinId pin) const {
+				return "In";
+			}
+
+			[[nodiscard]] virtual const char* getOutputLabel(
+				NodeImGui::PinId pin) const {
+				return "Out";
+			}
 
 			virtual void renderBody(Application* app, NodeEditor& editor) {
 				// Default node has no custom UI.
@@ -167,6 +219,290 @@ class Application {
 			Node* destination;
 		};
 
+		class RGBASplitNode : public Node {
+		   public:
+			NodeImGui::PinId redOutput;
+			NodeImGui::PinId greenOutput;
+			NodeImGui::PinId blueOutput;
+			NodeImGui::PinId alphaOutput;
+
+			[[nodiscard]] const char* name() const override {
+				return "RGBA Split";
+			}
+
+			[[nodiscard]] const char* getOutputLabel(
+				const NodeImGui::PinId pin) const override {
+				if (pin == redOutput) return "R";
+				if (pin == greenOutput) return "G";
+				if (pin == blueOutput) return "B";
+				if (pin == alphaOutput) return "A";
+
+				return "Out";
+			}
+
+			bool process(NodeEditor& editor, SDL_Renderer* renderer,
+						 Node* inputNode, SDL_Surface*& currentSurface,
+						 Application* app) override {
+				if (!currentSurface) {
+					SDL_Log("RGBA Split node has no current surface.");
+					return false;
+				}
+
+				utils::image_u8 img;
+
+				if (!editor.surfaceToImageU8(currentSurface, img)) {
+					SDL_Log(
+						"RGBA Split failed converting surface to image_u8.");
+					return false;
+				}
+
+				clearOutputSurfaces();
+
+				outputSurfaces[redOutput.Get()] =
+					makeChannelSurface(img, PinDataKind::Red);
+
+				outputSurfaces[greenOutput.Get()] =
+					makeChannelSurface(img, PinDataKind::Green);
+
+				outputSurfaces[blueOutput.Get()] =
+					makeChannelSurface(img, PinDataKind::Blue);
+
+				outputSurfaces[alphaOutput.Get()] =
+					makeChannelSurface(img, PinDataKind::Alpha);
+
+				if (texture) {
+					SDL_DestroyTexture(texture);
+					texture = nullptr;
+				}
+				sourceFile = inputNode->sourceFile;
+				outputFile.clear();
+
+				texture =
+					SDL_CreateTextureFromSurface(renderer, currentSurface);
+
+				return true;
+			}
+
+		   private:
+			static SDL_Surface* makeChannelSurface(const utils::image_u8& img,
+												   const PinDataKind channel) {
+				SDL_Surface* out =
+					SDL_CreateSurface(img.width(), img.height(),  // NOLINT
+									  SDL_PIXELFORMAT_RGBA32);
+
+				if (!out) {
+					SDL_Log("Failed creating channel surface: %s",
+							SDL_GetError());
+					return nullptr;
+				}
+
+				auto* dst = static_cast<uint8_t*>(out->pixels);
+
+				for (uint32_t y = 0; y < img.height(); ++y) {
+					for (uint32_t x = 0; x < img.width(); ++x) {
+						const utils::color_quad_u8 c = img(x, y);
+
+						uint8_t v = 0;
+
+						switch (channel) {
+							case PinDataKind::Red:
+								v = c.r;
+								break;
+							case PinDataKind::Green:
+								v = c.g;
+								break;
+							case PinDataKind::Blue:
+								v = c.b;
+								break;
+							case PinDataKind::Alpha:
+								v = c.a;
+								break;
+							default:
+								v = 0;
+								break;
+						}
+
+						uint8_t* p = dst + static_cast<size_t>(y * out->pitch) +
+									 static_cast<size_t>(x * 4);
+
+						p[0] = v;
+						p[1] = v;
+						p[2] = v;
+						p[3] = 255;
+					}
+				}
+
+				return out;
+			}
+		};
+
+		[[nodiscard]] SDL_Surface* getLinkedSurfaceForInput(
+			const NodeImGui::PinId inputPin) const {
+			for (const auto& link : links) {
+				if (link.endPin == inputPin) {
+					Node* upstream = findNodeOwningPin(link.startPin);
+
+					if (!upstream) return nullptr;
+
+					const auto it =
+						upstream->outputSurfaces.find(link.startPin.Get());
+
+					if (it != upstream->outputSurfaces.end()) {
+						return it->second;	// split channel output
+					}
+
+					if (upstream->surface) {
+						return upstream->surface;  // full image input
+					}
+
+					return nullptr;
+				}
+			}
+
+			return nullptr;
+		}
+
+		class RGBAToNewSurfaceNode : public Node {
+		   public:
+			NodeImGui::PinId redInput;
+			NodeImGui::PinId greenInput;
+			NodeImGui::PinId blueInput;
+			NodeImGui::PinId alphaInput;
+			NodeImGui::PinId imageOutput;
+
+			[[nodiscard]] const char* name() const override {
+				return "RGBA -> New Surface";
+			}
+
+			[[nodiscard]] const char* getInputLabel(
+				const NodeImGui::PinId pin) const override {
+				if (pin == redInput) return "R";
+				if (pin == greenInput) return "G";
+				if (pin == blueInput) return "B";
+				if (pin == alphaInput) return "A";
+
+				return "In";
+			}
+
+			[[nodiscard]] const char* getOutputLabel(
+				const NodeImGui::PinId pin) const override {
+				if (pin == imageOutput) return "RGBA";
+
+				return "Out";
+			}
+
+			bool process(NodeEditor& editor, SDL_Renderer* renderer,
+						 Node* inputNode, SDL_Surface*& currentSurface,
+						 Application* app) override {
+				SDL_Surface* r = editor.getLinkedSurfaceForInput(redInput);
+				SDL_Surface* g = editor.getLinkedSurfaceForInput(greenInput);
+				SDL_Surface* b = editor.getLinkedSurfaceForInput(blueInput);
+				SDL_Surface* a = editor.getLinkedSurfaceForInput(alphaInput);
+
+				SDL_Surface* result = combineChannels(r, g, b, a);
+
+				if (!result) {
+					SDL_Log("RGBA -> New Texture failed combining channels.");
+					return false;
+				}
+
+				if (currentSurface && currentSurface != inputNode->surface) {
+					SDL_DestroySurface(currentSurface);
+				}
+
+				currentSurface = result;
+
+				if (texture) {
+					SDL_DestroyTexture(texture);
+					texture = nullptr;
+				}
+
+				texture =
+					SDL_CreateTextureFromSurface(renderer, currentSurface);
+
+				sourceFile = inputNode->sourceFile;
+				outputFile.clear();	 // Clear output file since this is an
+									 // intermediate node
+
+				return true;
+			}
+
+		   private:
+			static uint8_t readGray(const SDL_Surface* surface, int x, int y) {
+				const auto* pixels = static_cast<uint8_t*>(surface->pixels);
+				const uint8_t* p = pixels +
+								   static_cast<ptrdiff_t>(y * surface->pitch) +
+								   static_cast<ptrdiff_t>(x * 4);
+				return p[0];
+			}
+
+			static SDL_Surface* convertToRGBA32(SDL_Surface* surface) {
+				if (!surface) return nullptr;
+				SDL_Surface* converted =
+					SDL_ConvertSurface(surface, SDL_PIXELFORMAT_RGBA32);
+				if (!converted) {
+					SDL_Log("Failed converting surface to RGBA32: %s",
+							SDL_GetError());
+				}
+				return converted;
+			}
+
+			static SDL_Surface* combineChannels(SDL_Surface* r, SDL_Surface* g,
+												SDL_Surface* b,
+												SDL_Surface* a) {
+				const int w =
+					r ? r->w : (g ? g->w : (b ? b->w : (a ? a->w : 1)));
+
+				const int h =
+					r ? r->h : (g ? g->h : (b ? b->h : (a ? a->h : 1)));
+
+				auto sameSize = [w, h](SDL_Surface* s) {
+					return !s || (s->w == w && s->h == h);
+				};
+
+				if (!sameSize(r) || !sameSize(g) || !sameSize(b) ||
+					!sameSize(a)) {
+					SDL_Log("RGBA channels must have matching dimensions.");
+					return nullptr;
+				}
+
+				SDL_Surface* rr = convertToRGBA32(r);
+				SDL_Surface* gg = convertToRGBA32(g);
+				SDL_Surface* bb = convertToRGBA32(b);
+				SDL_Surface* aa = convertToRGBA32(a);
+				SDL_Surface* result =
+					SDL_CreateSurface(w, h, SDL_PIXELFORMAT_RGBA32);
+
+				if (!result) return nullptr;
+
+				for (int y = 0; y < h; ++y) {
+					for (int x = 0; x < w; ++x) {
+						const uint8_t rv = rr ? readGray(rr, x, y) : 0;
+						const uint8_t gv = gg ? readGray(gg, x, y) : 0;
+						const uint8_t bv = bb ? readGray(bb, x, y) : 0;
+						const uint8_t av = aa ? readGray(aa, x, y) : 255;
+
+						auto* pixels = static_cast<uint8_t*>(result->pixels);
+						uint8_t* p = pixels +
+									 static_cast<ptrdiff_t>(y * result->pitch) +
+									 static_cast<ptrdiff_t>(x * 4);
+
+						p[0] = rv;
+						p[1] = gv;
+						p[2] = bv;
+						p[3] = av;
+					}
+				}
+
+				SDL_DestroySurface(rr);
+				SDL_DestroySurface(gg);
+				SDL_DestroySurface(bb);
+				SDL_DestroySurface(aa);
+
+				return result;
+			}
+		};
+
 		class InputNode : public Node {
 			bool containsImage = false;
 
@@ -175,7 +511,7 @@ class Application {
 				return "Input Node";
 			}
 			InputNode() { this->containsImage = false; }
-
+			std::string filename;
 			void renderBody(Application* app, NodeEditor& editor) override {
 				if (ImGui::Button("Import Image")) {
 					SDL_ShowOpenFileDialog(load_callback, app->renderer,
@@ -201,11 +537,19 @@ class Application {
 						}
 
 						sourceFile = selected_files.back();
+						const fs::path path(sourceFile);
+						filename = path.filename().string();
 
-						original_textures.pop_back();
-						selected_files.pop_back();
+						if (selected_files.size() > 1) {
+							original_textures.pop_back();
+							selected_files.pop_back();
+						}
 						this->containsImage = false;
 					}
+				}
+
+				if (!sourceFile.empty()) {
+					ImGui::Text("%s", filename.c_str());
 				}
 
 				if (texture != nullptr) {
@@ -213,8 +557,8 @@ class Application {
 					SDL_GetTextureSize(texture, &width, &height);
 
 					const float maxWidth =
-						1000.0f / width;  // Scale down if texture is wider than
-										  // 1000 pixels
+						150.0f / width;	 // Scale down if texture is wider than
+										 // 150 pixels
 					const float scaleFactor = std::min(maxWidth, 1.0f);
 
 					const ImVec2 scaledSize(width * scaleFactor,
@@ -230,7 +574,8 @@ class Application {
 			std::vector<Node*> processingPath;
 			Node* inputNode = nullptr;
 			bool fallbackToDisk = false;
-			bool generateMipmaps = false;
+			bool generateMipmaps = false;  // Remove?
+			bool outputfileSet = false;	   // Remove?
 
 		   public:
 			OutputNode() { this->containsImage = false; }
@@ -239,7 +584,6 @@ class Application {
 			}
 
 			void renderBody(Application* app, NodeEditor& editor) override {
-				ImGui::Checkbox("Generate mipmaps", &generateMipmaps);
 				if (selected_folder.empty()) {
 					if (ImGui::Button("Select folder")) {
 						SDL_ShowOpenFolderDialog(folder_callback, nullptr,
@@ -252,20 +596,22 @@ class Application {
 					if (!processingPath.empty()) {
 						inputNode = processingPath.front();
 						sourceFile = inputNode->sourceFile;
+						fileWritten = false;
 
 						SDL_Log("Found path with %lu nodes:",
 								processingPath.size());
 						SDL_Log("Input node: %s (ID: %lu)", inputNode->name(),
 								inputNode->id.Get());
-						editor.processPath(processingPath, app->renderer, app,
-										   generateMipmaps);
+						editor.processPath(processingPath, app->renderer, app);
 					} else {
 						SDL_Log("No path found");
 					}
 				}
 
 				if (!outputFile.empty()) {
-					ImGui::Text("Output: %s", outputFile.c_str());
+					const fs::path outputText(outputFile);
+					const std::string filename = outputText.filename().string();
+					ImGui::Text("Output: %s", filename.c_str());
 				}
 
 				if (texture != nullptr) {
@@ -273,7 +619,7 @@ class Application {
 					SDL_GetTextureSize(texture, &width, &height);
 
 					const float maxWidth =	// Scale down if texture is wider
-						1000.0f / width;	// than 1000 pixels
+						150.0f / width;		// than 150 pixels
 
 					const float scaleFactor = std::min(maxWidth, 1.0f);
 
@@ -313,7 +659,44 @@ class Application {
 					fallbackToDisk = true;
 				}
 
-				sourceFile = previousNode->sourceFile;
+				if (!fileWritten) {
+					std::string outName;
+					if (!inputNode->sourceFile.empty()) {
+						// Strip path and extension from sourceFile
+						const std::string& src = inputNode->sourceFile;
+						const fs::path path(src);
+
+						const std::string fname = path.stem().string();
+						const fs::path outPath = fs::path(selected_folder) /
+												 (fname + "_processed.png");
+						outName = outPath.string();
+
+						utils::image_u8 img;
+
+						if (!editor.surfaceToImageU8(currentSurface, img)) {
+							SDL_Log(
+								"Failed converting output surface to "
+								"image_u8.");
+							return false;
+						}
+
+						if (!utils::save_png(outName.c_str(), img, true)) {
+							SDL_Log("Failed saving PNG: %s", outName.c_str());
+							return false;
+						}
+
+						outputFile = outName;
+						SDL_Log("Output node wrote PNG: %s",
+								outputFile.c_str());
+						return true;
+					} else {
+						SDL_Log(
+							"Output node has no outputFile and no "
+							"currentSurface.");
+						return false;
+					}
+				}
+				// sourceFile = previousNode->sourceFile;
 				outputFile = previousNode->outputFile;
 
 				SDL_Log("Output node received file: %s", outputFile.c_str());
@@ -382,6 +765,7 @@ class Application {
 		   public:
 			bool isFinalCompressionNode = false;
 			bool generateMipmapsForExport = false;
+			bool isSRGB = false;
 
 			enum class CompressionType { BC7, BC5, BC4, BC3, BC2, BC1 };
 
@@ -412,6 +796,9 @@ class Application {
 						ImGui::Text("Compression: BC1");
 						break;
 				}
+
+				ImGui::Checkbox("Generate mipmaps", &generateMipmapsForExport);
+				ImGui::Checkbox("SRGB", &isSRGB);
 			}
 
 			bool process(NodeEditor& editor, SDL_Renderer* renderer,
@@ -421,6 +808,8 @@ class Application {
 					SDL_Log("Compression node has no input.");
 					return false;
 				}
+
+				outputFile.clear();
 
 				// If we have an in-memory surface from upstream, prefer that.
 				SDL_Surface* surfaceToCompress = currentSurface;
@@ -474,15 +863,12 @@ class Application {
 				if (!inputNode->sourceFile.empty()) {
 					// Strip path and extension from sourceFile
 					const std::string& src = inputNode->sourceFile;
-					size_t slash = src.find_last_of("/\\");
-					std::string fname = (slash == std::string::npos)
-											? src
-											: src.substr(slash + 1);
-					size_t dot = fname.find_last_of('.');
-					if (dot != std::string::npos) fname = fname.substr(0, dot);
-					outName = selected_folder + fname + "_" + typeName + ".dds";
-				} else {
-					outName = typeName + "_compressed.dds";
+					fs::path path(src);
+
+					std::string fname = path.stem().string();
+					fs::path outPath =
+						fs::path(selected_folder) / (fname + "_processed.dds");
+					outName = outPath.string();
 				}
 
 				// Compress to blocks and store on this node.
@@ -534,6 +920,16 @@ class Application {
 
 						params.m_dxgi_format = selectedDxgiFormat;
 
+						bool nowSRGB = isSRGB;
+
+						if (nowSRGB) {
+							params.m_mipmap_method =
+								utils::mipmap_generation_method_sRGBBox;
+						} else {
+							params.m_mipmap_method =
+								utils::mipmap_generation_method_LinearBox;
+						}
+
 						rdo_bc::rdo_bc_encoder encoder;
 
 						if (!encoder.init(img, params)) return false;
@@ -544,15 +940,17 @@ class Application {
 								encoder.get_orig_height(),
 								encoder.get_mip_levels(), encoder.get_blocks(),
 								encoder.get_pixel_format_bpp(),
-								encoder.get_pixel_format(), false, true)) {
+								encoder.get_pixel_format(), nowSRGB, true)) {
 							outputFile = outName;
 							SDL_Log("Compression node wrote DDS: %s",
 									outputFile.c_str());
+							fileWritten = true;
 							return true;
 						} else {
 							SDL_Log("Compression node failed to write DDS: %s",
 									outName.c_str());
-							outputFile = "";
+							outputFile.clear();
+							fileWritten = false;
 							return false;
 						}
 					}
@@ -571,8 +969,8 @@ class Application {
 
 					currentSurface = nextSurface;
 
-					sourceFile = inputNode->sourceFile;
-					outputFile = outName;
+					// sourceFile = inputNode->sourceFile;
+					// outputFile = outName;
 
 					SDL_DestroySurface(decoded);
 				}
@@ -891,15 +1289,14 @@ class Application {
 
 				for (const auto& inputPin : node->inputs) {
 					NodeImGui::BeginPin(inputPin, NodeImGui::PinKind::Input);
-					ImGui::Text("-> In");
+					ImGui::Text("-> %s", node->getInputLabel(inputPin));
 					NodeImGui::EndPin();
 				}
 
 				node->renderBody(a, *this);
-
 				for (const auto& outputPin : node->outputs) {
 					NodeImGui::BeginPin(outputPin, NodeImGui::PinKind::Output);
-					ImGui::Text("Out ->");
+					ImGui::Text("-> %s", node->getOutputLabel(outputPin));
 					NodeImGui::EndPin();
 				}
 
@@ -1042,7 +1439,7 @@ class Application {
 		// `sourceFile` to the current file, call its `process` method and
 		// advance the current file to the node's `outputFile` if it was set.
 		bool processPath(const std::vector<Node*>& path, SDL_Renderer* renderer,
-						 Application* app, const bool generateMipmaps) {
+						 Application* app) {
 			if (path.empty()) {
 				SDL_Log("processPath: empty path");
 				return false;
@@ -1069,13 +1466,11 @@ class Application {
 				currentSurface = IMG_Load(inputNode->sourceFile.c_str());
 			}
 
-			CompressionNode* lastCompressionNode = nullptr;
+			const CompressionNode* lastCompressionNode = nullptr;
 
-			if (generateMipmaps) {
-				SDL_Log("processPath: mipmap generation enabled");
-			}
 			for (Node* node : path) {
-				if (auto* compression = dynamic_cast<CompressionNode*>(node)) {
+				if (const auto* compression =
+						dynamic_cast<CompressionNode*>(node)) {
 					lastCompressionNode = compression;
 				}
 			}
@@ -1094,9 +1489,6 @@ class Application {
 				if (auto* compression = dynamic_cast<CompressionNode*>(node)) {
 					compression->isFinalCompressionNode =
 						compression == lastCompressionNode;
-
-					compression->generateMipmapsForExport =
-						generateMipmaps && compression == lastCompressionNode;
 				}
 				if (!node->process(*this, renderer, path[i - 1], currentSurface,
 								   app)) {
@@ -1375,6 +1767,65 @@ class Application {
 		nodeEditor.addNode(std::move(node));
 	}
 
+	void CreateRGBASplitNode() {
+		auto node = std::make_unique<NodeEditor::RGBASplitNode>();
+
+		node->id = nodeEditor.getUniqueId();
+
+		node->inputs.push_back(nodeEditor.getUniquePinId());
+
+		node->redOutput = nodeEditor.getUniquePinId();
+		node->greenOutput = nodeEditor.getUniquePinId();
+		node->blueOutput = nodeEditor.getUniquePinId();
+		node->alphaOutput = nodeEditor.getUniquePinId();
+
+		node->outputs.push_back(node->redOutput);
+		node->outputs.push_back(node->greenOutput);
+		node->outputs.push_back(node->blueOutput);
+		node->outputs.push_back(node->alphaOutput);
+
+		node->outputPinKinds[node->redOutput.Get()] =
+			NodeEditor::Node::PinDataKind::Red;
+
+		node->outputPinKinds[node->greenOutput.Get()] =
+			NodeEditor::Node::PinDataKind::Green;
+
+		node->outputPinKinds[node->blueOutput.Get()] =
+			NodeEditor::Node::PinDataKind::Blue;
+
+		node->outputPinKinds[node->alphaOutput.Get()] =
+			NodeEditor::Node::PinDataKind::Alpha;
+
+		const ImVec2 center = ImGui::GetMainViewport()->GetCenter();
+		NodeImGui::SetNodePosition(node->id, ImVec2(center.x, center.y));
+
+		nodeEditor.addNode(std::move(node));
+	}
+
+	void CreateRGBAToNewSurfaceNode() {
+		auto node = std::make_unique<NodeEditor::RGBAToNewSurfaceNode>();
+
+		node->id = nodeEditor.getUniqueId();
+
+		node->redInput = nodeEditor.getUniquePinId();
+		node->greenInput = nodeEditor.getUniquePinId();
+		node->blueInput = nodeEditor.getUniquePinId();
+		node->alphaInput = nodeEditor.getUniquePinId();
+
+		node->inputs.push_back(node->redInput);
+		node->inputs.push_back(node->greenInput);
+		node->inputs.push_back(node->blueInput);
+		node->inputs.push_back(node->alphaInput);
+
+		node->imageOutput = nodeEditor.getUniquePinId();
+		node->outputs.push_back(node->imageOutput);
+
+		const ImVec2 center = ImGui::GetMainViewport()->GetCenter();
+		NodeImGui::SetNodePosition(node->id, ImVec2(center.x, center.y));
+
+		nodeEditor.addNode(std::move(node));
+	}
+
 	static void HelpMarker(const char* desc) {
 		ImGui::TextDisabled("(?)");
 		if (ImGui::BeginItemTooltip()) {
@@ -1469,6 +1920,30 @@ class Application {
 			ImGui::SeparatorText("Options");
 			// vet inte riktigt vad som ska vara här
 		}
+
+		if (ImGui::CollapsingHeader("RGBA splitting")) {
+			ImGui::Dummy(ImVec2(0.0f, 10.0f));
+			if (ImGui::Button("Create RGBA-split Node")) {
+				CreateRGBASplitNode();
+			}
+			ImGui::SameLine();
+			HelpMarker(
+				"This node will be used to split the RGBA channels of the "
+				"input images. You can "
+				"process each channel separately, allowing for more advanced "
+				"image manipulation.");
+
+			if (ImGui::Button("Create RGBA-surface Node")) {
+				CreateRGBAToNewSurfaceNode();
+			}
+			ImGui::SameLine();
+			HelpMarker(
+				"This node will be used to create an RGBA surface from the "
+				"input images. You can "
+				"process each channel separately, allowing for more advanced "
+				"image manipulation.");
+		}
+
 		if (ImGui::CollapsingHeader("Mipmap")) {
 			ImGui::Dummy(ImVec2(0.0f, 10.0f));
 			if (ImGui::Button("Create MipMap Node")) {
